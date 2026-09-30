@@ -1,7 +1,7 @@
 {
-  "name": "electron-for-all",
+  "name": "workbench",
   "version": "1.0.0",
-  "description": "ElectronForAll 起步项目：双击启动显示 HelloWorld",
+  "description": "Workbench 起步项目：双击启动显示 HelloWorld",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -9,8 +9,8 @@
   },
   "author": "dreameryin",
   "build": {
-    "appId": "com.dreameryin.electronforall",
-    "productName": "ElectronForAll",
+    "appId": "com.dreameryin.workbench",
+    "productName": "Workbench",
     "win": {
       "target": "nsis"
     },

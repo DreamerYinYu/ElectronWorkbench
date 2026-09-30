@@ -10,7 +10,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 500,
     frame: false,
-    title: 'ElectronForAll',
+    title: 'Workbench',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js')
     }
