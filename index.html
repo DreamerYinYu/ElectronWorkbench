@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>ElectronForAll</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      height: 100%;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+    }
+
+    /* 自绘标题栏 */
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 38px;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e5e5;
+      -webkit-app-region: drag;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .titlebar-menus {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      padding-left: 12px;
+      -webkit-app-region: no-drag;
+    }
+    .titlebar-menus span {
+      font-size: 12px;
+      color: #333;
+      padding: 0 10px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      cursor: default;
+      border-radius: 4px;
+    }
+    .titlebar-menus span:hover {
+      background: #f0f0f0;
+    }
+
+    /* 窗口控制按钮 */
+    .window-controls {
+      display: flex;
+      height: 100%;
+      -webkit-app-region: no-drag;
+    }
+    .window-controls button {
+      width: 46px;
+      height: 100%;
+      border: none;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      outline: none;
+    }
+    .window-controls button:hover {
+      background: #e5e5e5;
+    }
+    .window-controls button.close:hover {
+      background: #e81123;
+    }
+    .window-controls button.close:hover svg {
+      stroke: #ffffff;
+    }
+    .window-controls svg {
+      width: 11px;
+      height: 11px;
+    }
+
+    /* 内容区 */
+    .content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+    }
+    .content h1 {
+      font-size: 48px;
+      font-weight: 500;
+      color: #333;
+    }
+
+    /* 最大化/还原图标切换 */
+    .icon-restore {
+      display: none;
+    }
+    body.maximized .icon-maximize {
+      display: none;
+    }
+    body.maximized .icon-restore {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header class="titlebar">
+    <div class="titlebar-menus">
+      <span>应用</span>
+      <span>编辑</span>
+    </div>
+    <div class="window-controls">
+      <button id="btn-minimize" title="最小化">
+        <svg viewBox="0 0 11 11"><rect x="0.5" y="5.5" width="10" height="1" fill="#333"/></svg>
+      </button>
+      <button id="btn-maximize" title="最大化">
+        <svg class="icon-maximize" viewBox="0 0 11 11"><rect x="0.5" y="0.5" width="10" height="10" fill="none" stroke="#333" stroke-width="1"/></svg>
+        <svg class="icon-restore" viewBox="0 0 11 11"><path d="M3.5 3.5 V1 H11 V8.5 H8.5" fill="none" stroke="#333" stroke-width="1"/><rect x="1" y="3.5" width="6.5" height="6.5" fill="none" stroke="#333" stroke-width="1"/></svg>
+      </button>
+      <button id="btn-close" class="close" title="关闭">
+        <svg viewBox="0 0 11 11"><path d="M1 1 L10 10 M10 1 L1 10" stroke="#333" stroke-width="1.1"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="content">
+    <h1>HelloWorld</h1>
+  </main>
+
+  <script>
+    const api = window.electronForAll;
+
+    document.getElementById('btn-minimize').addEventListener('click', () => {
+      api.minimize();
+    });
+    document.getElementById('btn-maximize').addEventListener('click', () => {
+      api.toggleMaximize();
+    });
+    document.getElementById('btn-close').addEventListener('click', () => {
+      api.close();
+    });
+
+    // 同步最大化/还原图标（覆盖双击标题栏、拖拽等系统触发方式）
+    api.onMaximizeChange((isMaximized) => {
+      document.body.classList.toggle('maximized', isMaximized);
+    });
+  </script>
+</body>
+</html>
