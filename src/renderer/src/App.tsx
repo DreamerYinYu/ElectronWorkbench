@@ -77,7 +77,6 @@ const ICON_PROPERTY = (
     <circle cx="8" cy="5" r="0.9" fill="currentColor" stroke="none" />
   </svg>
 )
-
 /** 取路径最后一段（文件名/文件夹名），兼容 Windows 反斜杠（渲染进程无 node path） */
 function basename(p: string): string {
   const i = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'))
@@ -105,6 +104,7 @@ export default function App() {
   const files = useWorkbench((s) => s.files)
   const selectedFiles = useWorkbench((s) => s.selectedFiles)
   const clipboard = useWorkbench((s) => s.clipboard)
+  const updateLinkSize = useWorkbench((s) => s.updateLinkSize)
   const copyEntries = useWorkbench((s) => s.copyEntries)
   const cutEntries = useWorkbench((s) => s.cutEntries)
   const pasteTo = useWorkbench((s) => s.pasteTo)
@@ -197,6 +197,11 @@ export default function App() {
   useEffect(() => {
     window.workbench.onFilesChanged(() => refreshFiles())
   }, [refreshFiles])
+
+  // 外链目录大小后台统计完成后，更新对应项大小（从「计算中」变真实值）
+  useEffect(() => {
+    window.workbench.onDirSizeDone((data) => updateLinkSize(data.path, data.size))
+  }, [updateLinkSize])
 
   const openEntry = (entry: FileEntry) => {
     // 外链路径丢失：不导航，直接弹出目录选择重新指定
@@ -343,7 +348,7 @@ export default function App() {
           { label: '名称', value: entry.name },
           { label: '类型', value: typeLabel(entry) },
           { label: '位置', value: path },
-          { label: '大小', value: formatSize(entry.size) },
+          { label: '大小', value: entry.link ? (entry.size < 0 ? '计算中' : formatSize(entry.size)) : formatSize(entry.size) },
           { label: '创建时间', value: formatMtime(stat.birthtime) },
           { label: '修改时间', value: formatMtime(entry.mtime) }
         ]
@@ -355,7 +360,7 @@ export default function App() {
           { label: '名称', value: entry.name },
           { label: '类型', value: typeLabel(entry) },
           { label: '位置', value: path },
-          { label: '大小', value: formatSize(entry.size) },
+          { label: '大小', value: entry.link ? (entry.size < 0 ? '计算中' : formatSize(entry.size)) : formatSize(entry.size) },
           { label: '修改时间', value: formatMtime(entry.mtime) }
         ]
       })

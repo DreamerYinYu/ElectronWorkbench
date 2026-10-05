@@ -99,6 +99,7 @@ interface WorkbenchState {
   clearSelection: () => void
   selectAll: () => void
   setSelectedFiles: (names: string[]) => void
+  updateLinkSize: (targetPath: string, size: number) => void
   copyEntries: (paths: string[]) => void
   cutEntries: (paths: string[]) => void
   pasteTo: (destDir: string, conflict: 'replace' | 'skip') => Promise<void>
@@ -170,6 +171,8 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
 
   selectProject: async (id) => {
     const p = get().projects.find((x) => x.id === id)
+    // 点击的已是当前项目、且正位于其根目录：跳过重新列目录/算大小/加载，避免无意义的重复工作
+    if (id === get().currentProjectId && get().currentDir === (p?.path ?? '')) return
     set({
       currentProjectId: id,
       currentDir: p?.path ?? '',
@@ -441,6 +444,12 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
 
   setSelectedFiles: (names) => {
     set({ selectedFiles: names, anchorName: names.length > 0 ? names[0] : null })
+  },
+
+  updateLinkSize: (targetPath, size) => {
+    set({
+      files: get().files.map((f) => (f.link && f.target === targetPath ? { ...f, size } : f))
+    })
   },
 
   copyEntries: (paths) => set({ clipboard: { mode: 'copy', paths } }),

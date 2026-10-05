@@ -3,7 +3,7 @@ import { existsSync, renameSync, readdirSync, statSync } from 'fs'
 import { join, dirname, resolve } from 'path'
 import { randomUUID } from 'crypto'
 import { loadProjects, saveProjects } from '../config'
-import { ensureProjectDir, readSettings, writeSettings, WORKBENCH_DIR } from '../projectFiles'
+import { ensureProjectDir, readSettings, writeSettings, readPinned, writePinned, WORKBENCH_DIR } from '../projectFiles'
 import { validateName } from '../paths'
 import type { ProjectMeta, ProjectSettings } from '../types'
 
@@ -118,6 +118,16 @@ export function registerProjectIpc(): void {
       settings.externalLinks.push({ name: safeName, targetPath })
     }
     writeSettings(p.path, settings)
+
+    // 迁移置顶：文件夹从普通→外链后，置顶路径由「项目内路径」迁移到「外部 targetPath」，否则置顶丢失
+    const oldPath = resolve(join(p.path, safeName))
+    const newPath = resolve(targetPath)
+    const pinned = readPinned(p.path)
+    const idx = pinned.indexOf(oldPath)
+    if (idx >= 0 && pinned.indexOf(newPath) < 0) {
+      pinned[idx] = newPath
+      writePinned(p.path, pinned)
+    }
   })
 
   // 重命名外部链接：同步重命名项目根下的占位文件夹，保持显示名与真实文件夹名一致

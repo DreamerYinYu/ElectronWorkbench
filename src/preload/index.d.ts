@@ -71,6 +71,7 @@ declare global {
         getPathForFile: (file: File) => string
       }
       onFilesChanged: (callback: () => void) => void
+      onDirSizeDone: (callback: (data: { path: string; size: number }) => void) => void
       todos: {
         list: (projectId: string) => Promise<TodoItem[]>
         add: (projectId: string, title: string) => Promise<TodoItem>

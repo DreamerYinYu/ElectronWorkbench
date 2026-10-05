@@ -541,7 +541,7 @@ export default function FileBrowser({
                     </span>
                   )}
                 </span>
-                <span className="col-size">{formatSize(f.size)}</span>
+                <span className="col-size">{f.link ? (f.size < 0 ? '计算中' : formatSize(f.size)) : formatSize(f.size)}</span>
                 <span className="col-type">{typeLabel(f)}</span>
                 <span className="col-time">{formatMtime(f.mtime)}</span>
               </div>

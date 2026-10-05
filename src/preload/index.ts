@@ -98,6 +98,9 @@ const api = {
   onFilesChanged: (callback: () => void): void => {
     ipcRenderer.on('fs:changed', () => callback())
   },
+  onDirSizeDone: (callback: (data: { path: string; size: number }) => void): void => {
+    ipcRenderer.on('fs:dirSizeDone', (_event, data: { path: string; size: number }) => callback(data))
+  },
 
   todos: {
     list: (projectId: string) => ipcRenderer.invoke('todo:list', projectId),

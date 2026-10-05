@@ -28,23 +28,62 @@ function resolveCopyTarget(destDir: string, name: string): string {
   return target
 }
 
-/** 递归计算目录总大小（字节）；符号链接按其指向统计避免循环，不可读则返回 0 */
-function dirSize(dir: string): number {
+/** 递归统计目录大小时的文件数预算上限，超出即停止，避免超大目录卡死主进程 */
+const DIR_SIZE_MAX_FILES = 5000
+
+/** 递归计算目录总大小（字节）；符号链接按其指向统计避免循环，不可读则返回 0；带文件数预算限流 */
+function dirSize(dir: string, budget: { left: number }): number {
   let st
   try {
     st = lstatSync(dir)
   } catch {
     return 0
   }
-  if (st.isSymbolicLink() || st.isFile()) return st.size
+  if (st.isSymbolicLink() || st.isFile()) {
+    budget.left--
+    return st.size
+  }
   if (!st.isDirectory()) return 0
   let total = 0
   try {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
-      total += dirSize(join(dir, e.name))
+      if (budget.left <= 0) break
+      total += dirSize(join(dir, e.name), budget)
     }
   } catch {
     // 目录不可读时返回已累计的部分
+  }
+  return total
+}
+
+/** 外链目录大小后台统计的进行中 Promise（按路径去重，避免重复统计同一大目录） */
+const dirSizePending = new Map<string, Promise<number>>()
+
+/** 异步分批统计目录大小：每处理一层让出事件循环，避免阻塞主进程（用于外链大目录后台统计） */
+async function dirSizeAsync(dir: string): Promise<number> {
+  let total = 0
+  const stack: string[] = [dir]
+  while (stack.length > 0) {
+    const current = stack.pop()!
+    let entries
+    try {
+      entries = readdirSync(current, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const e of entries) {
+      const full = join(current, e.name)
+      let st
+      try {
+        st = lstatSync(full)
+      } catch {
+        continue
+      }
+      if (st.isSymbolicLink()) continue
+      if (st.isFile()) total += st.size
+      else if (st.isDirectory()) stack.push(full)
+    }
+    await new Promise((r) => setImmediate(r))
   }
   return total
 }
@@ -102,7 +141,7 @@ function movePath(src: string, dest: string): void {
 }
 
 export function registerFsIpc(): void {
-  ipcMain.handle('fs:listDir', (_e, dir: string): FileEntry[] => {
+  ipcMain.handle('fs:listDir', (event, dir: string): FileEntry[] => {
     const resolved = validatePath(dir)
     const project = projectOf(resolved)
     const pinnedSet = new Set(project ? readPinned(project.path) : [])
@@ -135,7 +174,7 @@ export function registerFsIpc(): void {
           name: d.name,
           type: d.isDirectory() ? 'folder' : 'file',
           pinned: pinnedSet.has(full),
-          size: d.isDirectory() ? dirSize(full) : st.size,
+          size: d.isDirectory() ? dirSize(full, { left: DIR_SIZE_MAX_FILES }) : st.size,
           mtime: st.mtimeMs,
           ext: d.isDirectory() ? '' : extname(d.name).slice(1).toLowerCase()
         }
@@ -153,7 +192,7 @@ export function registerFsIpc(): void {
           existing.target = link.targetPath
           existing.linkBroken = broken
           existing.pinned = pinnedSet.has(resolve(link.targetPath))
-          existing.size = broken ? 0 : dirSize(link.targetPath)
+          existing.size = broken ? 0 : -1
         } else {
           entries.push({
             name: link.name,
@@ -162,10 +201,24 @@ export function registerFsIpc(): void {
             target: link.targetPath,
             linkBroken: broken,
             pinned: pinnedSet.has(resolve(link.targetPath)),
-            size: broken ? 0 : dirSize(link.targetPath),
+            size: broken ? 0 : -1,
             mtime: 0,
             ext: ''
           })
+        }
+
+        // 后台异步统计外链大小（不阻塞刷新），统计完广播给渲染层更新
+        if (!broken) {
+          const target = link.targetPath
+          if (!dirSizePending.has(target)) {
+            const p = dirSizeAsync(target)
+              .then((size) => {
+                event.sender.send('fs:dirSizeDone', { path: target, size })
+                return size
+              })
+              .finally(() => dirSizePending.delete(target))
+            dirSizePending.set(target, p)
+          }
         }
       }
     }
