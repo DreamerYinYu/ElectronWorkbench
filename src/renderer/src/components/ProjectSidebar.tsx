@@ -85,17 +85,22 @@ export default function ProjectSidebar({
   width,
   onNewProject,
   onProjectMenu,
-  onOpenSettings
+  onOpenSettings,
+  onRenameProject,
+  onDeleteProject
 }: {
   width?: number
   onNewProject: () => void
   onProjectMenu: (project: ProjectMeta, anchor: { x: number; y: number }) => void
   onOpenSettings: () => void
+  onRenameProject: (p: ProjectMeta) => void
+  onDeleteProject: (p: ProjectMeta) => void
 }) {
   const projects = useWorkbench((s) => s.projects)
   const currentProjectId = useWorkbench((s) => s.currentProjectId)
   const selectProject = useWorkbench((s) => s.selectProject)
   const reorderProjects = useWorkbench((s) => s.reorderProjects)
+  const selectedFiles = useWorkbench((s) => s.selectedFiles)
 
   // 本地排序列表：拖拽时实时重排（挤进去的动画），松手后持久化
   const [items, setItems] = useState<ProjectMeta[]>(projects)
@@ -104,6 +109,27 @@ export default function ProjectSidebar({
   useEffect(() => {
     setItems(projects)
   }, [projects])
+
+  // F2 重命名 / Delete 删除：作用于当前选中的项目（未选中文件时，避免与文件快捷键冲突）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement) {
+        if (e.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+      }
+      if (selectedFiles.length > 0) return
+      const project = items.find((p) => p.id === currentProjectId)
+      if (!project) return
+      if (e.key === 'F2') {
+        e.preventDefault()
+        onRenameProject(project)
+      } else if (e.key === 'Delete') {
+        e.preventDefault()
+        onDeleteProject(project)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))

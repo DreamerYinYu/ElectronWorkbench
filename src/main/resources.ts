@@ -5,3 +5,8 @@ import { join } from 'path'
 export function appIconPath(): string {
   return join(app.getAppPath(), 'resources/icon.png')
 }
+
+/** 应用图标（ICO，多尺寸）路径：Windows 托盘/快捷方式用，DPI 自适应 */
+export function iconIcoPath(): string {
+  return join(app.getAppPath(), 'resources/icon.ico')
+}

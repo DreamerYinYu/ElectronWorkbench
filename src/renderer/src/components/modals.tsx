@@ -70,23 +70,6 @@ export function NewProjectModal({ onClose }: { onClose: () => void }) {
         <label>项目名称</label>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：我的项目" autoFocus />
       </div>
-      <div className="modal-field">
-        <label>存放位置</label>
-        <div className="dir-pick">
-          <input value={parentDir} onChange={(e) => setParentDir(e.target.value)} />
-          <button
-            type="button"
-            className="btn"
-            onClick={async () => {
-              const dir = await window.workbench.selectDirectory()
-              if (dir) setParentDir(dir)
-            }}
-          >
-            浏览
-          </button>
-        </div>
-        <div className="modal-hint">将在此位置创建同名文件夹作为项目根目录</div>
-      </div>
     </Modal>
   )
 }

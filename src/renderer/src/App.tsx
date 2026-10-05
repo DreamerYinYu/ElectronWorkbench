@@ -474,6 +474,8 @@ export default function App() {
           onNewProject={() => setNewProjectOpen(true)}
           onProjectMenu={(p, anchor) => setProjectMenu({ project: p, anchor })}
           onOpenSettings={() => window.workbench.openSettings()}
+          onRenameProject={onRenameProject}
+          onDeleteProject={onDeleteProject}
         />
         <FileBrowser
           onPreview={openEntry}

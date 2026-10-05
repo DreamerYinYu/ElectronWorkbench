@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, ipcMain, protocol, net } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain, protocol, net, Tray } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { registerProjectIpc } from './ipc/project'
@@ -9,9 +9,11 @@ import { registerAppIpc } from './ipc/app'
 import { validatePath } from './paths'
 import { loadState, saveState } from './state'
 import { appearanceArgs } from './appSettings'
-import { appIconPath } from './resources'
+import { appIconPath, iconIcoPath } from './resources'
 
 let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
+let isQuitting = false
 
 // workbench 协议需支持 CORS，才能让 <video> 跨源加载并 canvas 截帧不污染
 protocol.registerSchemesAsPrivileged([
@@ -104,10 +106,48 @@ function createWindow(): void {
     mainWindow?.webContents.send('window:maximized', false)
     persistWindow()
   })
-  mainWindow.on('close', persistWindow)
+  mainWindow.on('close', (e) => {
+    // 托盘常驻：非退出流程下，关闭窗口时隐藏到托盘
+    if (!isQuitting) {
+      e.preventDefault()
+      mainWindow?.hide()
+    }
+    persistWindow()
+  })
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+}
+
+/** 显示并聚焦主窗口（窗口被隐藏到托盘后重新打开用） */
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+/** 创建系统托盘：左键单击打开主窗口，右键菜单打开/退出 */
+function createTray(): void {
+  tray = new Tray(iconIcoPath())
+  tray.setToolTip('Workbench')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '打开 Workbench', click: () => showMainWindow() },
+      { type: 'separator' },
+      {
+        label: '退出 Workbench',
+        click: () => {
+          isQuitting = true
+          app.quit()
+        }
+      }
+    ])
+  )
+  tray.on('click', () => showMainWindow())
 }
 
 Menu.setApplicationMenu(null)
@@ -121,6 +161,7 @@ app.whenReady().then(() => {
   registerAppIpc()
 
   createWindow()
+  createTray()
 
   ipcMain.on('window:minimize', (e) => {
     BrowserWindow.fromWebContents(e.sender)?.minimize()

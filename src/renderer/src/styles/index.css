@@ -11,6 +11,11 @@ textarea,
   user-select: text;
 }
 
+/* 桌面应用不需要键盘导航焦点框，统一禁用（输入框靠 border 颜色变化提示聚焦，不受影响） */
+:focus-visible {
+  outline: none;
+}
+
 :root {
   --bg: #f7f8fa;
   --panel: #ffffff;
