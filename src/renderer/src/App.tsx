@@ -183,15 +183,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // 窗口重新获得焦点时，同步磁盘状态：刷新项目列表 + 刷新当前文件列表
+  // 窗口重新获得焦点时，仅同步项目清单（新增/删除项目）；文件列表由 fs.watch 实时同步，
+  // 不再在此重复 refreshFiles（避免托盘打开/切回窗口时无谓地重新列目录+递归算文件夹大小）
   useEffect(() => {
     const onFocus = () => {
       rescanProjects()
-      refreshFiles()
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [rescanProjects, refreshFiles])
+  }, [rescanProjects])
 
   // 磁盘文件变化（新建/删除/改名任意格式）时，自动刷新当前文件列表
   useEffect(() => {

@@ -150,37 +150,47 @@ function createTray(): void {
   tray.on('click', () => showMainWindow())
 }
 
-Menu.setApplicationMenu(null)
-
-app.whenReady().then(() => {
-  registerProtocol()
-  registerProjectIpc()
-  registerFsIpc()
-  registerTodoIpc()
-  registerArchiveIpc()
-  registerAppIpc()
-
-  createWindow()
-  createTray()
-
-  ipcMain.on('window:minimize', (e) => {
-    BrowserWindow.fromWebContents(e.sender)?.minimize()
-  })
-  ipcMain.on('window:toggle-maximize', (e) => {
-    const w = BrowserWindow.fromWebContents(e.sender)
-    if (!w) return
-    if (w.isMaximized()) w.unmaximize()
-    else w.maximize()
-  })
-  ipcMain.on('window:close', (e) => {
-    BrowserWindow.fromWebContents(e.sender)?.close()
+// 单实例锁：仅允许一个实例运行；重复启动时唤起已有窗口而非新开实例
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    showMainWindow()
   })
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
+  Menu.setApplicationMenu(null)
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  app.whenReady().then(() => {
+    registerProtocol()
+    registerProjectIpc()
+    registerFsIpc()
+    registerTodoIpc()
+    registerArchiveIpc()
+    registerAppIpc()
+
+    createWindow()
+    createTray()
+
+    ipcMain.on('window:minimize', (e) => {
+      BrowserWindow.fromWebContents(e.sender)?.minimize()
+    })
+    ipcMain.on('window:toggle-maximize', (e) => {
+      const w = BrowserWindow.fromWebContents(e.sender)
+      if (!w) return
+      if (w.isMaximized()) w.unmaximize()
+      else w.maximize()
+    })
+    ipcMain.on('window:close', (e) => {
+      BrowserWindow.fromWebContents(e.sender)?.close()
+    })
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+}
