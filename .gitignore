@@ -142,3 +142,10 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 .workbuddy
+release
+
+# 工作台项目数据（用户数据，不提交）
+Projects/
+
+# electron-vite 编译配置时的临时产物
+electron.vite.config.*.mjs
