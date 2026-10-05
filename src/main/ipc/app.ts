@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, dialog, app } from 'electron'
+import { ipcMain, BrowserWindow, dialog, app, shell } from 'electron'
 import type { OpenDialogOptions } from 'electron'
 import { join, basename } from 'path'
 import { loadAppSettings, saveAppSettings, resolveDefaultProjectsDir, appearanceArgs } from '../appSettings'
@@ -111,6 +111,20 @@ export function registerAppIpc(): void {
     // 优先用设置里保存的项目文件夹，未设置时才回退到文档目录
     const s = loadAppSettings()
     return s.projectsFolder || resolveDefaultProjectsDir()
+  })
+
+  // 软件本地数据路径（设置面板展示用）：配置目录 + 项目文件夹
+  ipcMain.handle('app:getDataPaths', () => {
+    const s = loadAppSettings()
+    return {
+      configDir: join(app.getPath('appData'), 'Workbench'),
+      projectsFolder: s.projectsFolder || resolveDefaultProjectsDir()
+    }
+  })
+
+  // 打开任意本地路径（文件或文件夹），不做项目内越界校验（用于打开配置/项目目录）
+  ipcMain.handle('app:openPath', (_e, target: string): Promise<string> => {
+    return shell.openPath(target)
   })
 
   ipcMain.handle('state:getUi', () => loadState().ui)

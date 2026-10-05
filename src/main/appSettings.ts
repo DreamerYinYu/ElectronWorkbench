@@ -2,16 +2,30 @@ import { join } from 'path'
 import { app } from 'electron'
 import { loadSection, saveSection } from './store'
 
+/** 主题标识（完整配色预设）：浅色/深色/有风(绿)/同行(暖橙)/涟漪(蓝) */
+export type ThemeId = 'light' | 'dark' | 'wind' | 'peer' | 'ripple'
+
+/** 文本预览（txt）的显示样式偏好：记事本式，全局生效，不写入文件内容 */
+export interface TextPreviewStyle {
+  fontSize: number
+  fontFamily: string
+  bold: boolean
+  italic: boolean
+  underline: boolean
+}
+
 export interface AppSettings {
   autoStart: boolean
   projectsFolder: string
-  theme: 'light' | 'dark' | 'system'
+  theme: ThemeId
   /** 界面整体缩放比例，1 表示默认大小 */
   fontSize: number
   /** 全局隐藏项标识列表（如 ['unity_meta', 'node_modules']） */
   hiddenItems: string[]
   /** 上次压缩项目时使用的保存目录（空则回退项目父目录） */
   compressOutputDir: string
+  /** 文本预览显示样式偏好（全局共享） */
+  textPreview: TextPreviewStyle
 }
 
 export function defaultAppSettings(): AppSettings {
@@ -21,7 +35,8 @@ export function defaultAppSettings(): AppSettings {
     theme: 'light',
     fontSize: 1,
     hiddenItems: [],
-    compressOutputDir: ''
+    compressOutputDir: '',
+    textPreview: { fontSize: 13, fontFamily: '', bold: false, italic: false, underline: false }
   }
 }
 
@@ -32,6 +47,8 @@ export function loadAppSettings(): AppSettings {
   // 兼容旧字段名 defaultProjectsDir → projectsFolder
   const projectsFolder = raw.projectsFolder ?? raw.defaultProjectsDir ?? def.projectsFolder
   const merged: AppSettings = { ...def, ...raw, projectsFolder }
+  // textPreview 为嵌套对象，浅合并会整体覆盖，需单独深合并以保留缺省字段
+  merged.textPreview = { ...def.textPreview, ...(raw.textPreview ?? {}) }
   // 兼容旧版字符串档位（small/medium/large），迁移为数值缩放比例
   const rawFontSize = raw.fontSize
   if (typeof rawFontSize === 'string') {

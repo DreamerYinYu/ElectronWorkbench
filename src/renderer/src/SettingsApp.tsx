@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AppSettings } from './types'
+import type { AppSettings, ThemeId } from './types'
 import { applyAppearance } from './utils/appearance'
 import Titlebar from './components/Titlebar'
 
@@ -23,6 +23,14 @@ const FONT_SIZE_STOPS = [
   { value: 1, label: '默认' },
   { value: 1.15, label: '大' },
   { value: 1.35, label: '很大' }
+]
+
+const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
+  { id: 'light', label: '浅色' },
+  { id: 'dark', label: '深色' },
+  { id: 'wind', label: '有风' },
+  { id: 'peer', label: '同行' },
+  { id: 'ripple', label: '涟漪' }
 ]
 
 /** WorkBuddy 风格的字号滑杆：轨道 + 刻度点 + 可拖动滑块 + 下方标签 */
@@ -98,6 +106,11 @@ function GeneralPanel({
   settings: AppSettings
   save: (patch: Partial<AppSettings>) => void
 }) {
+  const [configDir, setConfigDir] = useState('')
+  useEffect(() => {
+    window.workbench.getDataPaths().then((p) => setConfigDir(p.configDir))
+  }, [])
+
   return (
     <>
       <div className="settings-section-title">常规</div>
@@ -108,28 +121,6 @@ function GeneralPanel({
         </div>
         <Switch checked={settings.autoStart} onChange={(v) => save({ autoStart: v })} />
       </div>
-      <div className="setting-row">
-        <div className="setting-info">
-          <div className="setting-name">项目存放位置</div>
-          <div className="setting-desc">新建项目时默认在此目录下创建项目文件夹。</div>
-        </div>
-        <div className="setting-dir">
-          <input
-            className="setting-input"
-            value={settings.projectsFolder}
-            onChange={(e) => save({ projectsFolder: e.target.value })}
-          />
-          <button
-            className="btn"
-            onClick={async () => {
-              const dir = await window.workbench.selectDirectory()
-              if (dir) save({ projectsFolder: dir })
-            }}
-          >
-            浏览
-          </button>
-        </div>
-      </div>
       <div className="settings-section-title">显示</div>
       <div className="setting-row">
         <div className="setting-info">
@@ -137,6 +128,45 @@ function GeneralPanel({
           <div className="setting-desc">调整界面整体文字大小，立即生效。</div>
         </div>
         <FontSizeSlider value={settings.fontSize} onChange={(f) => save({ fontSize: f })} />
+      </div>
+      <div className="settings-section-title">本地存储</div>
+      <div className="setting-row setting-group">
+        <div className="setting-item">
+          <div className="setting-info">
+            <div className="setting-name">项目位置</div>
+            <div className="setting-desc" style={{ wordBreak: 'break-all' }}>
+              {settings.projectsFolder || '未设置'}
+            </div>
+          </div>
+          <button
+            className="btn"
+            onClick={async () => {
+              const dir = await window.workbench.selectDirectory()
+              if (dir) save({ projectsFolder: dir })
+            }}
+          >
+            更改
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              if (settings.projectsFolder) void window.workbench.openPath(settings.projectsFolder)
+            }}
+          >
+            打开目录
+          </button>
+        </div>
+        <div className="setting-item">
+          <div className="setting-info">
+            <div className="setting-name">系统缓存目录</div>
+            <div className="setting-desc" style={{ wordBreak: 'break-all' }}>
+              {configDir || '加载中…'}
+            </div>
+          </div>
+          <button className="btn" onClick={() => configDir && void window.workbench.openPath(configDir)}>
+            打开目录
+          </button>
+        </div>
       </div>
     </>
   )
@@ -155,16 +185,16 @@ function AppearancePanel({
       <div className="setting-row">
         <div className="setting-info">
           <div className="setting-name">外观主题</div>
-          <div className="setting-desc">选择浅色、深色，或跟随系统自动切换，立即生效。</div>
+          <div className="setting-desc">选择整套配色主题，立即生效。</div>
         </div>
         <div className="option-group">
-          {(['light', 'dark', 'system'] as const).map((t) => (
+          {THEME_OPTIONS.map((t) => (
             <button
-              key={t}
-              className={`option-item ${settings.theme === t ? 'active' : ''}`}
-              onClick={() => save({ theme: t })}
+              key={t.id}
+              className={`option-item ${settings.theme === t.id ? 'active' : ''}`}
+              onClick={() => save({ theme: t.id })}
             >
-              {t === 'light' ? '浅色' : t === 'dark' ? '深色' : '跟随系统'}
+              {t.label}
             </button>
           ))}
         </div>

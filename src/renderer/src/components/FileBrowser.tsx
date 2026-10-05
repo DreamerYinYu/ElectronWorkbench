@@ -69,6 +69,7 @@ export default function FileBrowser({
   onCopy,
   onCut,
   onPaste,
+  onDelete,
   canPaste
 }: {
   onPreview: (entry: FileEntry) => void
@@ -77,6 +78,7 @@ export default function FileBrowser({
   onCopy: () => void
   onCut: () => void
   onPaste: () => void
+  onDelete: () => void
   canPaste: boolean
 }) {
   const currentProjectId = useWorkbench((s) => s.currentProjectId)
@@ -277,6 +279,9 @@ export default function FileBrowser({
         e.preventDefault()
         const entry = files.find((f) => f.name === selectedFiles[0])
         if (entry) onRename(entry)
+      } else if (e.key === 'Delete' && selectedFiles.length > 0 && !editable) {
+        e.preventDefault()
+        onDelete()
       } else if ((e.ctrlKey || e.metaKey) && hovering && !editable) {
         const k = e.key.toLowerCase()
         if (k === 'a' && files.length > 0) {

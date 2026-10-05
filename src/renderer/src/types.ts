@@ -45,14 +45,27 @@ export type SortKey = 'name' | 'size' | 'type' | 'mtime'
 export type SortDir = 'asc' | 'desc'
 export type ViewMode = 'grid' | 'list'
 
+export type ThemeId = 'light' | 'dark' | 'wind' | 'peer' | 'ripple'
+
+/** 文本预览（txt）的显示样式偏好：记事本式，全局生效，不写入文件内容 */
+export interface TextPreviewStyle {
+  fontSize: number
+  fontFamily: string
+  bold: boolean
+  italic: boolean
+  underline: boolean
+}
+
 export interface AppSettings {
   autoStart: boolean
   projectsFolder: string
-  theme: 'light' | 'dark' | 'system'
+  theme: ThemeId
   /** 界面整体缩放比例，1 表示默认大小 */
   fontSize: number
   /** 全局隐藏项标识列表 */
   hiddenItems: string[]
   /** 上次压缩项目时使用的保存目录（空则回退项目父目录） */
   compressOutputDir: string
+  /** 文本预览显示样式偏好（全局共享） */
+  textPreview: TextPreviewStyle
 }

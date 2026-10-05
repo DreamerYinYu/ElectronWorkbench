@@ -20,6 +20,9 @@ const api = {
   getDefaultProjectsDir: (): Promise<string> => ipcRenderer.invoke('app:getDefaultProjectsDir'),
   openSettings: (tab?: string): Promise<void> => ipcRenderer.invoke('app:openSettings', tab),
   selectDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectDirectory'),
+  getDataPaths: (): Promise<{ configDir: string; projectsFolder: string }> =>
+    ipcRenderer.invoke('app:getDataPaths'),
+  openPath: (target: string): Promise<string> => ipcRenderer.invoke('app:openPath', target),
   preview: {
     open: (filePath: string): Promise<void> => ipcRenderer.invoke('preview:open', filePath),
     getFile: (): Promise<string> => ipcRenderer.invoke('preview:getFile'),

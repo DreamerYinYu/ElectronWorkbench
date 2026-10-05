@@ -304,6 +304,13 @@ export default function App() {
     })
   }
 
+  // 键盘 Delete 删除：复用 onDeleteEntry，取选中集合第一项触发（多选时 onDeleteEntry 会删全部选中）
+  const onDelete = () => {
+    if (selectedFiles.length === 0) return
+    const first = files.find((f) => f.name === selectedFiles[0])
+    if (first) onDeleteEntry(first)
+  }
+
   const onShowInFolder = (entry: FileEntry) => {
     const target = entry.link && entry.target ? entry.target : `${currentDir}/${entry.name}`
     window.workbench.fs.showInFolder(target)
@@ -475,6 +482,7 @@ export default function App() {
           onCopy={() => onCopyOrCut('copy')}
           onCut={() => onCopyOrCut('cut')}
           onPaste={() => void onPaste(currentDir)}
+          onDelete={onDelete}
           canPaste={Boolean(clipboard && clipboard.paths.length > 0)}
         />
         <TodoPanel width={todoWidth} />

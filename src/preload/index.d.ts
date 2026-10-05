@@ -12,6 +12,8 @@ declare global {
       getDefaultProjectsDir: () => Promise<string>
       openSettings: (tab?: string) => Promise<void>
       selectDirectory: () => Promise<string | null>
+      getDataPaths: () => Promise<{ configDir: string; projectsFolder: string }>
+      openPath: (target: string) => Promise<string>
       preview: {
         open: (filePath: string) => Promise<void>
         getFile: () => Promise<string>

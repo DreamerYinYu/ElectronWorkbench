@@ -10,16 +10,14 @@ import ConfirmDialog from './components/ConfirmDialog'
 const PLAIN_TEXT_EXTS = new Set(['txt', 'rtf'])
 const RICH_TEXT_EXTS = new Set(['md'])
 
-const FONT_SIZES = [16, 18, 20, 22, 24, 26, 28, 32, 36, 40]
+const FONT_SIZES = [13, 16, 18, 20, 22, 24, 26, 28, 32, 36, 40]
 
 const FONT_FAMILIES: { name: string; value: string }[] = [
   { name: '宋体', value: "SimSun, '宋体', serif" },
   { name: '微软雅黑', value: "'Microsoft YaHei', '微软雅黑', sans-serif" },
   { name: '黑体', value: "'SimHei', '黑体', sans-serif" },
   { name: '等线', value: "'DengXian', '等线', sans-serif" },
-  { name: '楷体', value: "'KaiTi', '楷体', serif" },
-  { name: 'Consolas', value: "Consolas, 'Courier New', monospace" },
-  { name: 'Courier New', value: "'Courier New', monospace" }
+  { name: '楷体', value: "'KaiTi', '楷体', serif" }
 ]
 
 type RegisterSave = (fn: () => Promise<void>) => void
@@ -47,11 +45,38 @@ function TextPreview({
   const [cursor, setCursor] = useState({ line: 1, col: 1 })
 
   // 全局显示样式（记事本式：作用于整个编辑区，不写入 txt 文件）
-  const [fontSize, setFontSize] = useState(24)
+  const [fontSize, setFontSize] = useState(13)
   const [fontFamily, setFontFamily] = useState('')
   const [bold, setBold] = useState(false)
   const [italic, setItalic] = useState(false)
   const [underline, setUnderline] = useState(false)
+
+  // 挂载时读取持久化的显示样式（记事本式，全局共享，下次打开仍生效）
+  const styleLoadedRef = useRef(false)
+  useEffect(() => {
+    window.workbench.appSettings.get().then((s) => {
+      const tp = s.textPreview
+      if (tp) {
+        setFontSize(typeof tp.fontSize === 'number' ? tp.fontSize : 13)
+        setFontFamily(typeof tp.fontFamily === 'string' ? tp.fontFamily : '')
+        setBold(Boolean(tp.bold))
+        setItalic(Boolean(tp.italic))
+        setUnderline(Boolean(tp.underline))
+      }
+      styleLoadedRef.current = true
+    })
+  }, [])
+
+  // 样式变化时持久化（跳过初始加载触发的写回）
+  useEffect(() => {
+    if (!styleLoadedRef.current) return
+    window.workbench.appSettings.get().then((s) => {
+      window.workbench.appSettings.save({
+        ...s,
+        textPreview: { fontSize, fontFamily, bold, italic, underline }
+      })
+    })
+  }, [fontSize, fontFamily, bold, italic, underline])
 
   useEffect(() => {
     setContent(null)
@@ -234,9 +259,14 @@ export default function PreviewApp() {
     saveRef.current = fn
   }
 
+  // 文件有未保存修改时，标题栏/任务栏标题加 * 提示（如 工作备忘录.txt*）
+  useEffect(() => {
+    document.title = dirty ? `${name}*` : name
+  }, [dirty, name])
+
   return (
     <div className="preview-app">
-      <Titlebar title={name} />
+      <Titlebar title={dirty ? `${name}*` : name} />
 
       <div className="preview-content">
         {isImage && <img className="preview-media" src={fileUrl(path)} alt={name} />}

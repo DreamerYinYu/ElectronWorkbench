@@ -36,6 +36,10 @@ textarea,
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.14);
   --radius: 10px;
+  /* 全局统一字号：所有 UI 文字一律引用此变量，标题/正文仅靠加粗区分，禁止散落硬编码字号 */
+  --font-size-base: 13px;
+  /* 全局统一字体：UI 与文本编辑器共用，禁止散落硬编码字体 */
+  --font-family-base: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 [data-theme='dark'] {
@@ -62,30 +66,45 @@ textarea,
   --scrollbar-thumb-hover: #52555b;
 }
 
-@media (prefers-color-scheme: dark) {
-  [data-theme='system'] {
-    --bg: #17181a;
-    --panel: #222326;
-    --panel-weak: #2a2b2f;
-    --border: #333438;
-    --border-strong: #3f4146;
-    --text: #e6e7e9;
-    --text-secondary: #a5a7ac;
-    --text-faint: #71737a;
-    --primary: #e8eaed;
-    --primary-hover: #f5f6f7;
-    --primary-text: #17181a;
-    --primary-weak: #2e3033;
-    --danger: #e5695f;
-    --danger-weak: #3a2627;
-    --avatar-bg: #3a3c40;
-    --switch-off: #3f4146;
-    --tag-bg: #3a3323;
-    --tag-color: #d5b06a;
-    --tag-border: #4d442c;
-    --scrollbar-thumb: #3f4146;
-    --scrollbar-thumb-hover: #52555b;
-  }
+/* ===== 主题预设 ===== */
+
+/* 有风（绿，明亮清新） */
+[data-theme='wind'] {
+  --bg: #f1f6f2;
+  --panel: #ffffff;
+  --panel-weak: #f6faf7;
+  --border: #e5ece7;
+  --border-strong: #d7e1da;
+  --primary: #16a34a;
+  --primary-hover: #15803d;
+  --primary-text: #ffffff;
+  --primary-weak: #e6f5ec;
+}
+
+/* 同行（暖橙，温暖童趣） */
+[data-theme='peer'] {
+  --bg: #faf5ee;
+  --panel: #ffffff;
+  --panel-weak: #fdf9f3;
+  --border: #efe7db;
+  --border-strong: #e3d8c7;
+  --primary: #e8863c;
+  --primary-hover: #d9732a;
+  --primary-text: #ffffff;
+  --primary-weak: #fdf0e2;
+}
+
+/* 涟漪（蓝，干净清爽） */
+[data-theme='ripple'] {
+  --bg: #f1f6fa;
+  --panel: #ffffff;
+  --panel-weak: #f6fafc;
+  --border: #e5edf2;
+  --border-strong: #d7e2ea;
+  --primary: #0ea5e9;
+  --primary-hover: #0284c7;
+  --primary-text: #ffffff;
+  --primary-weak: #e6f3fb;
 }
 
 html,
@@ -95,10 +114,24 @@ body,
 }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+}
+
+/* 表单元素默认不继承 body 字号（用浏览器默认值），这里显式统一，避免下拉框/输入框/按钮字号不一致 */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: var(--font-size-base);
+}
+
+select option {
+  font-size: var(--font-size-base);
 }
 
 ::-webkit-scrollbar {
@@ -158,17 +191,17 @@ body {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 700;
 }
 
 .titlebar-name {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
 }
 
 .titlebar-tag {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   background: var(--bg);
   border-radius: 4px;
@@ -233,7 +266,7 @@ body {
 }
 
 .sidebar-head > span {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   letter-spacing: 0.4px;
   color: var(--text-faint);
@@ -266,7 +299,7 @@ body {
 
 .sidebar-empty {
   padding: 20px 10px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   text-align: center;
 }
@@ -318,7 +351,7 @@ body.is-dragging * {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 700;
 }
 
@@ -328,7 +361,7 @@ body.is-dragging * {
 }
 
 .project-name {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -386,7 +419,7 @@ body.is-dragging * {
   flex-shrink: 0;
   background: var(--avatar-bg);
   color: #fff;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -394,7 +427,7 @@ body.is-dragging * {
 }
 
 .uname {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text);
   flex: 1;
   text-align: left;
@@ -420,7 +453,7 @@ body.is-dragging * {
 }
 
 .user-panel-name {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 700;
 }
 
@@ -429,7 +462,7 @@ body.is-dragging * {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   border-radius: 8px;
   cursor: pointer;
 }
@@ -445,7 +478,7 @@ body.is-dragging * {
 
 .up-shortcut {
   margin-left: auto;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
 }
 
@@ -532,7 +565,7 @@ body.is-dragging * {
   border: 1px solid var(--border-strong);
   background: var(--panel);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -564,7 +597,7 @@ body.is-dragging * {
 }
 
 .file-count {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   white-space: nowrap;
   flex-shrink: 0;
@@ -628,7 +661,7 @@ body.is-dragging * {
   padding: 10px 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   white-space: nowrap;
   overflow-x: auto;
 }
@@ -653,7 +686,7 @@ body.is-dragging * {
 
 .crumb-sep {
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: var(--font-size-base);
 }
 
 .file-area {
@@ -682,7 +715,7 @@ body.is-dragging * {
   gap: 10px;
   padding: 0 16px;
   border-top: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   background: var(--panel);
 }
@@ -712,7 +745,7 @@ body.is-dragging * {
   align-items: center;
   justify-content: center;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   line-height: 1.6;
 }
 
@@ -738,7 +771,7 @@ body.is-dragging * {
   align-items: center;
   justify-content: center;
   color: var(--primary);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   pointer-events: none;
   z-index: 55;
@@ -840,7 +873,7 @@ body.is-dragging * {
 }
 
 .file-name {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   line-height: 1.35;
   color: var(--text);
   word-break: break-all;
@@ -852,7 +885,7 @@ body.is-dragging * {
 }
 
 .link-tag {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--tag-color);
   background: var(--tag-bg);
   border: 1px solid var(--tag-border);
@@ -868,7 +901,7 @@ body.is-dragging * {
 
 .link-broken-suffix {
   color: var(--danger);
-  font-size: 13px;
+  font-size: var(--font-size-base);
 }
 
 /* 列表视图 */
@@ -905,7 +938,7 @@ body.is-dragging * {
   height: 100%;
   padding: 0 16px;
   box-sizing: border-box;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   will-change: transform;
 }
@@ -934,7 +967,7 @@ body.is-dragging * {
 .col-size {
   width: 76px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
   text-align: left;
 }
@@ -942,7 +975,7 @@ body.is-dragging * {
 .col-type {
   width: 70px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
   text-align: left;
 }
@@ -950,7 +983,7 @@ body.is-dragging * {
 .col-time {
   width: 140px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
   text-align: right;
 }
@@ -966,7 +999,7 @@ body.is-dragging * {
 }
 
 .load-hint {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   font-weight: 400;
   white-space: nowrap;
@@ -1027,7 +1060,7 @@ body.is-dragging * {
 .row-label {
   flex: 0 1 auto;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1051,7 +1084,7 @@ body.is-dragging * {
 
 .todo-head {
   padding: 14px 16px 10px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   line-height: 24px;
   display: flex;
@@ -1060,7 +1093,7 @@ body.is-dragging * {
 }
 
 .todo-head .count {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   font-weight: 400;
 }
@@ -1074,7 +1107,7 @@ body.is-dragging * {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   outline: none;
   font-family: inherit;
   background: var(--panel);
@@ -1102,7 +1135,7 @@ body.is-dragging * {
 }
 
 .todo-group-title {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   padding: 4px 8px 6px;
 }
@@ -1149,7 +1182,7 @@ body.is-dragging * {
 
 .todo-text {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   line-height: 1.4;
   word-break: break-all;
 }
@@ -1164,7 +1197,7 @@ body.is-dragging * {
   padding: 4px 8px;
   border: 1px solid var(--primary);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   outline: none;
   font-family: inherit;
   background: var(--panel);
@@ -1205,7 +1238,7 @@ body.is-dragging * {
 .todo-empty {
   text-align: center;
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   padding: 20px 0;
 }
 
@@ -1230,7 +1263,7 @@ body.is-dragging * {
 
 .modal-head {
   padding: 16px 18px 0;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
 }
 
@@ -1244,7 +1277,7 @@ body.is-dragging * {
 
 .modal-field label {
   display: block;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
   margin-bottom: 6px;
 }
@@ -1254,7 +1287,7 @@ body.is-dragging * {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   outline: none;
   font-family: inherit;
   background: var(--panel);
@@ -1266,7 +1299,7 @@ body.is-dragging * {
 }
 
 .modal-hint {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   margin-top: 4px;
   line-height: 1.5;
@@ -1282,7 +1315,7 @@ body.is-dragging * {
 }
 
 .conflict-item {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   padding: 7px 0;
   border-bottom: 1px solid var(--border);
 }
@@ -1307,7 +1340,7 @@ body.is-dragging * {
 }
 
 .conflict-side {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1325,7 +1358,7 @@ body.is-dragging * {
   gap: 16px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--font-size-base);
 }
 
 .prop-row:last-child {
@@ -1352,7 +1385,7 @@ body.is-dragging * {
 }
 
 .modal-text {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
   line-height: 1.7;
 }
@@ -1365,7 +1398,7 @@ body.is-dragging * {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   cursor: pointer;
 }
 
@@ -1388,14 +1421,14 @@ body.is-dragging * {
 }
 
 .ext-link-name {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .ext-link-path {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1407,7 +1440,7 @@ body.is-dragging * {
   background: transparent;
   color: var(--danger);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   flex-shrink: 0;
 }
 
@@ -1434,7 +1467,7 @@ body.is-dragging * {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   border-radius: 7px;
   cursor: pointer;
 }
@@ -1514,8 +1547,8 @@ body.is-dragging * {
   overflow: auto;
   margin: 0;
   padding: 20px;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
@@ -1525,8 +1558,8 @@ body.is-dragging * {
 .preview-textarea {
   flex: 1;
   padding: 16px;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
   line-height: 1.6;
   border: none;
   outline: none;
@@ -1543,7 +1576,7 @@ body.is-dragging * {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
 }
 
 .preview-info .big {
@@ -1552,7 +1585,7 @@ body.is-dragging * {
 }
 
 .preview-info .dim {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   margin: 0;
 }
@@ -1574,7 +1607,7 @@ body.is-dragging * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -1588,7 +1621,7 @@ body.is-dragging * {
 }
 
 .rt-letter {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   line-height: 1;
   display: inline-block;
 }
@@ -1616,7 +1649,7 @@ body.is-dragging * {
   padding: 4px 14px;
   border-top: 1px solid var(--border);
   background: var(--panel);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   flex-shrink: 0;
 }
@@ -1641,8 +1674,8 @@ body.is-dragging * {
 }
 
 .preview-code .cm-scroller {
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
 }
 
 /* ===== 富文本编辑器（md/html） ===== */
@@ -1666,7 +1699,7 @@ body.is-dragging * {
 .preview-rich .rt-content .tiptap {
   outline: none;
   min-height: 100%;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   line-height: 1.7;
   color: var(--text);
 }
@@ -1676,17 +1709,17 @@ body.is-dragging * {
 }
 
 .preview-rich .rt-content .tiptap h1 {
-  font-size: 1.8em;
+  font-size: var(--font-size-base);
   margin: 0.6em 0 0.4em;
 }
 
 .preview-rich .rt-content .tiptap h2 {
-  font-size: 1.5em;
+  font-size: var(--font-size-base);
   margin: 0.6em 0 0.4em;
 }
 
 .preview-rich .rt-content .tiptap h3 {
-  font-size: 1.25em;
+  font-size: var(--font-size-base);
   margin: 0.5em 0 0.3em;
 }
 
@@ -1707,8 +1740,8 @@ body.is-dragging * {
   background: var(--bg);
   padding: 12px;
   border-radius: 8px;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
   overflow-x: auto;
 }
 
@@ -1716,8 +1749,8 @@ body.is-dragging * {
   background: var(--bg);
   padding: 1px 5px;
   border-radius: 4px;
-  font-family: ui-monospace, "SF Mono", Consolas, monospace;
-  font-size: 0.9em;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
 }
 
 .preview-rich .rt-content .tiptap pre code {
@@ -1738,7 +1771,7 @@ body.is-dragging * {
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   cursor: pointer;
   outline: none;
 }
@@ -1787,13 +1820,13 @@ body.is-dragging * {
 }
 
 .file-type-label {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
 }
 
 .ft-btn {
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   border: 1px solid var(--border-strong);
   background: transparent;
   color: var(--text-secondary);
@@ -1827,7 +1860,7 @@ body.is-dragging * {
 }
 
 .settings-title {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   padding-left: 14px;
 }
@@ -1875,7 +1908,7 @@ body.is-dragging * {
   gap: 8px;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
   cursor: pointer;
   margin-bottom: 2px;
@@ -1907,7 +1940,7 @@ body.is-dragging * {
 }
 
 .settings-section-title {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   margin: 4px 0 12px;
   color: var(--text);
@@ -1924,18 +1957,45 @@ body.is-dragging * {
   margin-bottom: 12px;
 }
 
+/* 分组卡片：多个设置项共用一个卡片，中间用分割线分隔 */
+.setting-group {
+  display: block;
+  padding: 0;
+}
+
+.setting-group .setting-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.setting-group .setting-item + .setting-item {
+  position: relative;
+}
+
+.setting-group .setting-item + .setting-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+  background: var(--border);
+}
+
 .setting-info {
   flex: 1;
   min-width: 0;
 }
 
 .setting-name {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
 }
 
 .setting-desc {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
   margin-top: 3px;
   line-height: 1.5;
@@ -1946,7 +2006,7 @@ body.is-dragging * {
   padding: 7px 10px;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   outline: none;
   font-family: inherit;
   flex-shrink: 0;
@@ -1980,7 +2040,7 @@ body.is-dragging * {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   outline: none;
   font-family: inherit;
   background: var(--panel);
@@ -2003,7 +2063,7 @@ body.is-dragging * {
   border: 1px solid var(--border-strong);
   background: var(--panel);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-base);
   cursor: pointer;
 }
 
@@ -2092,7 +2152,7 @@ body.is-dragging * {
 }
 
 .font-slider-label {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text-faint);
 }
 
@@ -2131,7 +2191,7 @@ body.is-dragging * {
 
 /* 文件显示设置：分组标题与复选框行 */
 .hide-group-title {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--text-faint);
   margin-bottom: 6px;
@@ -2145,7 +2205,7 @@ body.is-dragging * {
   border: 1px solid var(--border);
   border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-base);
   color: var(--text);
   margin-bottom: 6px;
   background: var(--panel);
