@@ -629,10 +629,16 @@ export default function DesktopView({
       <div className="desktop-menubar">
         <span className="desktop-menubar-menu">访达</span>
         <span className="desktop-menubar-menu">文件</span>
-        <span className="desktop-menubar-menu desktop-menubar-menu-action" onClick={openEditMenu}>
+        <span
+          className={`desktop-menubar-menu desktop-menubar-menu-action${editMenu ? ' desktop-menubar-menu-open' : ''}`}
+          onClick={openEditMenu}
+        >
           编辑
         </span>
-        <span className="desktop-menubar-menu desktop-menubar-menu-action" onClick={openViewMenu}>
+        <span
+          className={`desktop-menubar-menu desktop-menubar-menu-action${viewMenu ? ' desktop-menubar-menu-open' : ''}`}
+          onClick={openViewMenu}
+        >
           查看
         </span>
         <span className="desktop-menubar-menu">前往</span>
@@ -640,7 +646,7 @@ export default function DesktopView({
         <span className="desktop-menubar-menu">帮助</span>
         <div className="desktop-menubar-spacer" />
         <span className="desktop-menubar-time">
-          {time.getMonth() + 1}月{time.getDate()}日 周{week} {pad(time.getHours())}:{pad(time.getMinutes())}
+          {time.getFullYear()}年{time.getMonth() + 1}月{time.getDate()}日 周{week} {pad(time.getHours())}:{pad(time.getMinutes())}
         </span>
       </div>
 

@@ -91,6 +91,9 @@ export function Menu({
     it.onClick?.()
   }
 
+  // 仅当菜单里存在带勾选的项时才渲染勾选占位（✓ 对齐用），普通菜单不占左侧空白
+  const hasCheck = items.some((it) => it.checked !== undefined)
+
   return (
     <>
       <div
@@ -115,7 +118,7 @@ export function Menu({
               onMouseEnter={(e) => openSub(i, e.currentTarget)}
               onMouseLeave={scheduleCloseSub}
             >
-              <span className="ctx-check">{it.checked ? '✓' : ''}</span>
+              {hasCheck && <span className="ctx-check">{it.checked ? '✓' : ''}</span>}
               {it.icon && <span className="ctx-icon">{it.icon}</span>}
               <span className="ctx-label">{it.label}</span>
               <span className="ctx-arrow">›</span>
@@ -129,7 +132,7 @@ export function Menu({
                 runItem(it)
               }}
             >
-              <span className="ctx-check">{it.checked ? '✓' : ''}</span>
+              {hasCheck && <span className="ctx-check">{it.checked ? '✓' : ''}</span>}
               {it.icon && <span className="ctx-icon">{it.icon}</span>}
               <span className="ctx-label">{it.label}</span>
             </div>
