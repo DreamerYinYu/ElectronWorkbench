@@ -49,7 +49,7 @@ export default function DesktopIcon({ entry, size = 64 }: { entry: FileEntry; si
 
   if (isVirtual) {
     const isBin = entry.shellPath?.includes('645FF040')
-    return isBin ? <RecycleBinIcon size={48} /> : <ComputerIcon size={48} />
+    return isBin ? <RecycleBinIcon size={size} /> : <ComputerIcon size={size} />
   }
   if (isFolderLink) return <FileIcon type="folder" ext="" link size={size} />
   if (hasThumb) return <Thumbnail entry={entry} size={size} />

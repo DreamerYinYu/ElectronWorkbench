@@ -22,6 +22,7 @@ const api = {
   getWallpaper: (): Promise<string | null> => ipcRenderer.invoke('app:getWallpaper'),
   getAppIcon: (): Promise<string> => ipcRenderer.invoke('app:getAppIcon'),
   openSettings: (tab?: string): Promise<void> => ipcRenderer.invoke('app:openSettings', tab),
+  resetAllData: (): Promise<void> => ipcRenderer.invoke('app:resetAllData'),
   selectDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectDirectory'),
   getDataPaths: (): Promise<{ configDir: string; projectsFolder: string }> =>
     ipcRenderer.invoke('app:getDataPaths'),
@@ -45,6 +46,12 @@ const api = {
   state: {
     getUi: () => ipcRenderer.invoke('state:getUi'),
     saveUi: (ui: unknown) => ipcRenderer.invoke('state:saveUi', ui)
+  },
+  desktop: {
+    getLayout: () => ipcRenderer.invoke('desktop:getLayout'),
+    saveLayout: (layout: unknown) => ipcRenderer.invoke('desktop:saveLayout', layout),
+    getSystemInfo: () => ipcRenderer.invoke('desktop:getSystemInfo'),
+    getTodos: () => ipcRenderer.invoke('desktop:getTodos')
   },
   onAppearanceChanged: (callback: (settings: unknown) => void): void => {
     ipcRenderer.on('appearance:changed', (_event, settings) => callback(settings))

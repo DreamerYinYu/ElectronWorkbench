@@ -2,13 +2,14 @@ import { app } from 'electron'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs'
 import { join, dirname } from 'path'
 
-export type SectionKey = 'settings' | 'projects' | 'ui' | 'window'
+export type SectionKey = 'settings' | 'projects' | 'ui' | 'window' | 'desktop'
 
 interface StoreData {
   settings: unknown
   projects: unknown
   ui: unknown
   window: unknown
+  desktop: unknown
 }
 
 function storePath(): string {
@@ -20,7 +21,7 @@ function legacyDir(): string {
 }
 
 function emptyData(): StoreData {
-  return { settings: null, projects: [], ui: null, window: null }
+  return { settings: null, projects: [], ui: null, window: null, desktop: null }
 }
 
 let cache: StoreData | null = null
@@ -107,5 +108,11 @@ export function loadSection<K extends SectionKey>(key: K): StoreData[K] {
 
 export function saveSection<K extends SectionKey>(key: K, value: StoreData[K]): void {
   load()[key] = value
+  persist()
+}
+
+/** 清空全部配置数据（settings/projects/ui/window/desktop），写回默认空结构，恢复出厂默认 */
+export function resetAll(): void {
+  cache = emptyData()
   persist()
 }

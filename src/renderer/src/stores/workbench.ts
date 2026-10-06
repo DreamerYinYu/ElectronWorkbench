@@ -6,7 +6,10 @@ import type {
   ProjectSettings,
   SortKey,
   SortDir,
-  ViewMode
+  ViewMode,
+  DesktopLayout,
+  DesktopWidget,
+  DesktopIconPos
 } from '../types'
 import { typeLabel } from '../utils/format'
 
@@ -24,6 +27,67 @@ function sortFiles(files: FileEntry[], key: SortKey, dir: SortDir): FileEntry[] 
     if (key === 'mtime') return mult * (a.mtime - b.mtime)
     return 0
   })
+}
+
+/** 迁移旧桌面布局（pages/grid/像素坐标）到新 icons 网格坐标；补齐缺省字段 */
+function migrateLayout(raw: DesktopLayout | null): DesktopLayout {
+  if (!raw) return { icons: [], widgets: [], dock: [] }
+  const any = raw as unknown as {
+    pages?: string[][]
+    grid?: { kind: string; key?: string; id?: string }[]
+    icons?: { key: string; col?: number; row?: number; x?: number; y?: number }[]
+    widgets?: { id: string; type: DesktopWidget['type']; w: number; h: number; col?: number; row?: number; x?: number; y?: number }[]
+    dock?: string[]
+    autoArrange?: boolean
+  }
+
+  // 像素 → 网格坐标（列宽 96 + 间距 14 = 110，起点 20）
+  const toCol = (v: number): number => Math.max(0, Math.round((v - 20) / 110))
+  const toRow = (v: number): number => Math.max(0, Math.round((v - 20) / 110))
+
+  let icons: DesktopIconPos[]
+  let widgets: DesktopWidget[]
+  let dock: string[]
+
+  if (Array.isArray(any.icons)) {
+    icons = any.icons.map((p) => {
+      if (typeof p.col === 'number' && typeof p.row === 'number') {
+        return { key: p.key, col: p.col, row: p.row }
+      }
+      return { key: p.key, col: toCol(p.x ?? 0), row: toRow(p.y ?? 0) }
+    })
+    widgets = (any.widgets ?? []).map((w) => {
+      if (typeof w.col === 'number' && typeof w.row === 'number') {
+        return { id: w.id, type: w.type, w: w.w, h: w.h, col: w.col, row: w.row }
+      }
+      return { id: w.id, type: w.type, w: w.w, h: w.h, col: toCol(w.x ?? 0), row: toRow(w.y ?? 0) }
+    })
+    dock = any.dock ?? []
+  } else {
+    const keys: string[] = []
+    if (Array.isArray(any.grid)) {
+      for (const g of any.grid) if (g && g.kind === 'icon' && g.key) keys.push(g.key)
+    } else if (Array.isArray(any.pages)) {
+      for (const page of any.pages) for (const k of page) keys.push(k)
+    }
+    const COLS = 8
+    icons = keys.map((key, i) => ({ key, col: i % COLS, row: Math.floor(i / COLS) }))
+    widgets = (any.widgets ?? []).map((w, i) => ({
+      id: w.id,
+      type: w.type,
+      w: w.w,
+      h: w.h,
+      col: (i % 4) * 2,
+      row: Math.floor(i / 4) * 2 + 3
+    }))
+    dock = any.dock ?? []
+  }
+
+  // 清理：dock 里的图标从 icons 移除（移动语义：icons 与 dock 互斥，避免幽灵占用）
+  const dockSet = new Set(dock)
+  icons = icons.filter((p) => !dockSet.has(p.key))
+
+  return { icons, widgets, dock, autoArrange: any.autoArrange ?? true }
 }
 
 /** 把当前 UI 状态写入 state.json（主进程统一管理）；防抖避免拖拽栏宽时频繁写盘 */
@@ -60,6 +124,10 @@ interface WorkbenchState {
   desktopPath: string
   /** 系统桌面壁纸（dataURL），桌面视图背景用 */
   wallpaper: string | null
+  /** 桌面布局（分页/小组件/Dock 钉选），null 表示未加载 */
+  desktopLayout: DesktopLayout | null
+  /** 桌面是否处于编辑模式（图标抖动 + 减号） */
+  desktopEditing: boolean
   view: ViewMode
   sortKey: SortKey
   sortDir: SortDir
@@ -85,6 +153,9 @@ interface WorkbenchState {
   goToPath: (path: string) => Promise<void>
   refreshFiles: () => Promise<void>
   refreshWallpaper: () => Promise<void>
+  loadDesktopLayout: () => Promise<void>
+  saveDesktopLayout: (layout: DesktopLayout) => Promise<void>
+  setDesktopEditing: (editing: boolean) => void
   setView: (view: ViewMode) => void
   setSort: (key: SortKey) => void
   setSidebarWidth: (w: number) => void
@@ -127,6 +198,8 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   activeNav: 'project',
   desktopPath: '',
   wallpaper: null,
+  desktopLayout: null,
+  desktopEditing: false,
   view: 'grid',
   sortKey: 'name',
   sortDir: 'asc',
@@ -222,6 +295,7 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
     // 不 watch 桌面目录：递归监听 Shell 桌面目录会扰动 explorer 桌面（图标重绘/排列重置），
     // 桌面文件变化改由窗口聚焦时刷新（见 App.tsx onFocus）
     await get().refreshWallpaper()
+    await get().loadDesktopLayout()
     await get().refreshFiles()
   },
 
@@ -229,6 +303,23 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   refreshWallpaper: async () => {
     const wp = await window.workbench.getWallpaper()
     set({ wallpaper: wp })
+  },
+
+  // 加载桌面布局（分页/小组件/Dock）；无配置时用空布局，只显示程序，小组件由用户自行添加
+  loadDesktopLayout: async () => {
+    const layout = await window.workbench.desktop.getLayout()
+    set({ desktopLayout: migrateLayout(layout) })
+  },
+
+  // 保存桌面布局（拖拽/增删/编辑后持久化）
+  saveDesktopLayout: async (layout) => {
+    set({ desktopLayout: layout })
+    await window.workbench.desktop.saveLayout(layout)
+  },
+
+  // 切换桌面编辑模式（图标抖动 + 左上角减号）
+  setDesktopEditing: (editing) => {
+    set({ desktopEditing: editing })
   },
 
   // 资料库入口（占位）：功能后续完善，先清空内容区

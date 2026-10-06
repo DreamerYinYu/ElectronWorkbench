@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AppSettings, ThemeId } from './types'
 import { applyAppearance } from './utils/appearance'
 import Titlebar from './components/Titlebar'
+import ConfirmDialog from './components/ConfirmDialog'
 
 type SettingsTab = 'general' | 'appearance' | 'files' | 'about'
 
@@ -107,6 +108,7 @@ function GeneralPanel({
   save: (patch: Partial<AppSettings>) => void
 }) {
   const [configDir, setConfigDir] = useState('')
+  const [confirming, setConfirming] = useState(false)
   useEffect(() => {
     window.workbench.getDataPaths().then((p) => setConfigDir(p.configDir))
   }, [])
@@ -166,8 +168,29 @@ function GeneralPanel({
           <button className="btn" onClick={() => configDir && void window.workbench.openPath(configDir)}>
             打开目录
           </button>
+          <button className="btn danger" onClick={() => setConfirming(true)}>
+            清除缓存
+          </button>
         </div>
       </div>
+      {confirming && (
+        <ConfirmDialog
+          title="清除缓存"
+          message="将清空全部配置数据（设置、项目清单、界面状态、桌面布局），恢复默认。此操作不可撤销。"
+          buttons={[
+            { label: '取消', onClick: () => setConfirming(false) },
+            {
+              label: '清除缓存',
+              variant: 'danger',
+              onClick: () => {
+                setConfirming(false)
+                void window.workbench.resetAllData()
+              }
+            }
+          ]}
+          onClose={() => setConfirming(false)}
+        />
+      )}
     </>
   )
 }

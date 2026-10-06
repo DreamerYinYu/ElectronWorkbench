@@ -41,3 +41,31 @@ export interface ExternalLink {
 export interface ProjectSettings {
   externalLinks: ExternalLink[]
 }
+
+/** 图标在桌面上的网格坐标（col/row，整数格，可留空；列宽自适应容器宽度） */
+export interface DesktopIconPos {
+  key: string
+  col: number
+  row: number
+}
+
+/** 桌面小组件：占网格整数槽位（w/h 为占的列/行数），col/row 为左上角网格坐标 */
+export interface DesktopWidget {
+  id: string
+  type: 'clock' | 'todos' | 'projects' | 'system'
+  w: number
+  h: number
+  col: number
+  row: number
+}
+
+/** 桌面布局配置（存 workbench.json 的 desktop 段）：图标网格坐标 + 小组件 + Dock 钉选 */
+export interface DesktopLayout {
+  /** 图标网格坐标（可留空；列宽自适应容器宽度） */
+  icons: DesktopIconPos[]
+  widgets: DesktopWidget[]
+  /** Dock 里的图标标识数组（移动语义：与 icons 互斥，同一图标只在 icons 或 dock 之一） */
+  dock: string[]
+  /** 自动排列图标（A-Z 按名称 + 行列自适应）；false = 尊重用户自定义拖拽排列 */
+  autoArrange?: boolean
+}

@@ -6,6 +6,8 @@ export interface MenuItem {
   icon?: ReactNode
   danger?: boolean
   disabled?: boolean
+  /** 勾选标记（左侧 ✓，用于「自动排列/自定义排列」这类互斥选项） */
+  checked?: boolean
   /** 子菜单（有此项即渲染为可展开的二级菜单，不再响应点击） */
   children?: MenuItem[]
   onClick?: () => void
@@ -113,6 +115,7 @@ export function Menu({
               onMouseEnter={(e) => openSub(i, e.currentTarget)}
               onMouseLeave={scheduleCloseSub}
             >
+              <span className="ctx-check">{it.checked ? '✓' : ''}</span>
               {it.icon && <span className="ctx-icon">{it.icon}</span>}
               <span className="ctx-label">{it.label}</span>
               <span className="ctx-arrow">›</span>
@@ -126,6 +129,7 @@ export function Menu({
                 runItem(it)
               }}
             >
+              <span className="ctx-check">{it.checked ? '✓' : ''}</span>
               {it.icon && <span className="ctx-icon">{it.icon}</span>}
               <span className="ctx-label">{it.label}</span>
             </div>

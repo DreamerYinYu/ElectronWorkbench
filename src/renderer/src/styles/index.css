@@ -786,100 +786,390 @@ body.is-dragging * {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--panel);
+  background: #1a2436;
   position: relative;
   overflow: hidden;
+  user-select: none;
 }
 
-.desktop-crumb {
+/* ===== 顶部 macOS 菜单栏（深色玻璃） ===== */
+.desktop-menubar {
+  height: 32px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 10px 16px;
+  gap: 16px;
+  padding: 0 14px;
+  background: rgba(22, 26, 36, 0.55);
+  backdrop-filter: blur(14px);
+  color: #fff;
   font-size: var(--font-size-base);
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.55);
+  position: relative;
+  z-index: 5;
 }
 
-.desktop-crumb-item {
+.desktop-menubar-menu {
   cursor: default;
-  padding: 2px 5px;
+  opacity: 0.92;
+}
+.desktop-menubar-menu:hover {
+  opacity: 1;
+}
+
+.desktop-menubar-menu-action {
+  cursor: pointer;
+  padding: 2px 6px;
   border-radius: 4px;
 }
-
-.desktop-crumb-item:hover {
-  background: rgba(0, 0, 0, 0.06);
+.desktop-menubar-menu-action:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
 }
 
-.desktop-crumb .current {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.desktop-crumb-sep {
-  color: var(--text-faint);
-}
-
-.desktop-grid {
+.desktop-menubar-spacer {
   flex: 1;
-  overflow-y: auto;
-  padding: 28px 32px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 96px);
-  gap: 26px 20px;
-  align-content: start;
-  justify-content: center;
 }
 
-.desktop-icon {
+.desktop-menubar-time {
+  opacity: 0.92;
+}
+
+/* ===== 网格区（仅竖向滚动，原生滚动条） ===== */
+.desktop-pages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.desktop-canvas {
+  position: relative;
+  width: 100%;
+}
+
+/* ===== 网格项（图标 / 小组件，绝对定位，列宽由 inline 自适应） ===== */
+.desktop-item {
+  position: absolute;
+  height: 96px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
+  border-radius: 14px;
   cursor: default;
-  padding: 10px 6px;
-  border-radius: var(--radius);
+  padding: 6px 2px;
+  min-height: 0;
+}
+.desktop-item:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
-.desktop-icon:hover {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-.desktop-icon.selected {
+.desktop-item.selected {
   background: rgba(59, 130, 246, 0.32);
 }
 
-.desktop-icon.selected:hover {
-  background: rgba(59, 130, 246, 0.4);
+.desktop-item.selected:hover {
+  background: rgba(59, 130, 246, 0.42);
 }
 
-.desktop-icon-img {
-  width: 72px;
-  height: 72px;
+/* 拖拽跟手预览（fixed 定位覆盖在 Dock 之上，暗色半透明，跟随鼠标视口坐标） */
+.desktop-drag-ghost {
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.desktop-icon-holder {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.desktop-widget-item {
+  position: absolute;
+  border-radius: 14px;
+}
+
+.desktop-widget-holder {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.desktop-item-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.desktop-item-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.desktop-item-label {
+  font-size: var(--font-size-base);
+  color: #fff;
+  text-align: center;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.desktop-real-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ===== 小组件卡片 ===== */
+.desktop-widget {
+  border-radius: 18px;
+  background: rgba(22, 26, 36, 0.5);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  padding: 14px 16px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.desktop-widget-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.desktop-widget-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+.desktop-widget-clock-time {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+}
+
+.desktop-widget-sub {
+  font-size: var(--font-size-base);
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+  margin-top: 4px;
+}
+
+.desktop-widget-empty {
+  font-size: var(--font-size-base);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.desktop-widget-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.desktop-widget-todo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-size-base);
+}
+
+.desktop-widget-todo-title {
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-widget-todo-project {
+  color: rgba(255, 255, 255, 0.55);
+  flex-shrink: 0;
+}
+
+.desktop-widget-project {
+  font-size: var(--font-size-base);
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-widget-project:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.desktop-widget-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.desktop-widget-bar-label {
+  font-size: var(--font-size-base);
+  color: rgba(255, 255, 255, 0.75);
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.desktop-widget-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.desktop-widget-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #378add;
+}
+
+.desktop-widget-bar-pct {
+  font-size: var(--font-size-base);
+  color: rgba(255, 255, 255, 0.75);
+  width: 34px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ===== 编辑模式：抖动 + 减号 ===== */
+.desktop-item.jiggling .desktop-icon-holder,
+.desktop-item.jiggling .desktop-widget-holder,
+.desktop-dock-icon.jiggling {
+  animation: desktop-jiggle 0.28s ease-in-out infinite;
+}
+
+@keyframes desktop-jiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-2.5deg);
+  }
+  75% {
+    transform: rotate(2.5deg);
+  }
+}
+
+.desktop-remove-btn {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #8a8a8e;
+  border: 1.5px solid #fff;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 3;
+  padding: 0;
+}
+.desktop-remove-btn:hover {
+  background: #6b6b6f;
+}
+
+/* ===== 页码指示点 ===== */
+.desktop-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  flex-shrink: 0;
+}
+
+.desktop-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+}
+.desktop-dot.active {
+  background: #fff;
+}
+
+/* ===== 底部 Dock（背景条铺满，左右 padding 与内容区一致） ===== */
+.desktop-dock {
+  flex-shrink: 0;
+  padding: 16px 20px;
+}
+
+.desktop-dock-inner {
+  width: 100%;
+  min-height: 80px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(22, 26, 36, 0.55);
+  backdrop-filter: blur(14px);
+  border-radius: 18px;
+}
+
+.desktop-dock-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.desktop-dock-icon-inner {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
-.desktop-real-icon {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  display: block;
+.desktop-dock-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-
-.desktop-icon-label {
-  font-size: var(--font-size-base);
-  color: var(--text);
-  text-align: center;
-  max-width: 92px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: rgba(255, 255, 255, 0.75);
-  padding: 1px 6px;
-  border-radius: 4px;
+.desktop-dock-icon:hover {
+  transform: translateY(-4px) scale(1.06);
+  transition: transform 0.15s ease;
 }
 
 /* 资料库占位视图 */
@@ -1670,6 +1960,16 @@ body.is-dragging * {
   font-size: var(--font-size-base);
   border-radius: 7px;
   cursor: pointer;
+}
+
+.ctx-check {
+  width: 15px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .ctx-icon {

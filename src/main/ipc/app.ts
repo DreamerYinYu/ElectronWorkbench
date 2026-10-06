@@ -1,13 +1,18 @@
 import { ipcMain, BrowserWindow, dialog, app, shell } from 'electron'
 import type { OpenDialogOptions } from 'electron'
 import { join, basename } from 'path'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, statfsSync } from 'fs'
+import os from 'os'
 import { loadAppSettings, saveAppSettings, resolveDefaultProjectsDir, appearanceArgs } from '../appSettings'
 import type { AppSettings } from '../appSettings'
 import { loadState, saveState } from '../state'
 import type { UiState } from '../state'
 import { appIconPath } from '../resources'
 import { readWallpaper } from '../platform'
+import { loadSection, saveSection, resetAll } from '../store'
+import type { DesktopLayout } from '../types'
+import { loadProjects } from '../config'
+import { readTodos } from '../projectFiles'
 
 let settingsWindow: BrowserWindow | null = null
 let previewWindow: BrowserWindow | null = null
@@ -120,6 +125,42 @@ export function registerAppIpc(): void {
     return readWallpaper()
   })
 
+  // 桌面布局（分页/小组件/Dock 钉选）读取；从未保存过时返回 null，渲染层据此预置默认小组件
+  ipcMain.handle('desktop:getLayout', (): DesktopLayout | null => {
+    return (loadSection('desktop') as DesktopLayout | null) ?? null
+  })
+
+  // 桌面布局保存（拖拽/增删小组件/编辑 Dock 后持久化）
+  ipcMain.handle('desktop:saveLayout', (_e, layout: DesktopLayout): void => {
+    saveSection('desktop', layout)
+  })
+
+  // 系统状态小组件：内存占用 + 应用数据盘磁盘空间
+  ipcMain.handle('desktop:getSystemInfo', () => {
+    const totalMem = os.totalmem()
+    const freeMem = os.freemem()
+    let disk = { total: 0, free: 0 }
+    try {
+      const s = statfsSync(app.getPath('appData'))
+      disk = { total: s.bsize * s.blocks, free: s.bsize * s.bavail }
+    } catch {
+      // statfs 不可用时磁盘返回 0
+    }
+    return { mem: { used: totalMem - freeMem, total: totalMem }, disk }
+  })
+
+  // 待办小组件：所有项目未完成待办（按项目名分组，最多取 6 条）
+  ipcMain.handle('desktop:getTodos', () => {
+    const projects = loadProjects()
+    const items: { project: string; title: string }[] = []
+    for (const p of projects) {
+      for (const t of readTodos(p.path)) {
+        if (!t.completed) items.push({ project: p.name, title: t.title })
+      }
+    }
+    return items.slice(0, 6)
+  })
+
   // 应用图标（icon.png）转 base64 dataURL，标题栏 logo 展示用
   ipcMain.handle('app:getAppIcon', (): string => {
     try {
@@ -161,6 +202,16 @@ export function registerAppIpc(): void {
 
   ipcMain.handle('app:openSettings', (_e, tab?: string) => {
     openSettingsWindow(tab)
+  })
+
+  // 清除全部缓存数据：清空 workbench.json（settings/projects/ui/window/desktop），恢复默认；
+  // 同步关闭开机自启，然后 reload 所有窗口让其重新按默认加载
+  ipcMain.handle('app:resetAllData', (): void => {
+    resetAll()
+    app.setLoginItemSettings({ openAtLogin: false })
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.reload()
+    }
   })
 
   ipcMain.handle('app:getSettings', () => {

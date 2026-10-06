@@ -1,4 +1,4 @@
-import type { ProjectMeta, FileEntry, TodoItem, ProjectSettings } from '../main/types'
+import type { ProjectMeta, FileEntry, TodoItem, ProjectSettings, DesktopLayout } from '../main/types'
 import type { AppSettings } from '../main/appSettings'
 import type { UiState } from '../main/state'
 
@@ -14,6 +14,7 @@ declare global {
       getWallpaper: () => Promise<string | null>
       getAppIcon: () => Promise<string>
       openSettings: (tab?: string) => Promise<void>
+      resetAllData: () => Promise<void>
       selectDirectory: () => Promise<string | null>
       getDataPaths: () => Promise<{ configDir: string; projectsFolder: string }>
       openPath: (target: string) => Promise<string>
@@ -32,6 +33,12 @@ declare global {
       state: {
         getUi: () => Promise<UiState>
         saveUi: (ui: UiState) => Promise<void>
+      }
+      desktop: {
+        getLayout: () => Promise<DesktopLayout | null>
+        saveLayout: (layout: DesktopLayout) => Promise<void>
+        getSystemInfo: () => Promise<{ mem: { used: number; total: number }; disk: { total: number; free: number } }>
+        getTodos: () => Promise<{ project: string; title: string }[]>
       }
       onAppearanceChanged: (callback: (settings: AppSettings) => void) => () => void
       onSettingsSwitchTab: (callback: (tab: string) => void) => void

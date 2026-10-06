@@ -136,7 +136,9 @@ export default function App() {
 
   const onSidebarResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!sidebarResizeRef.current || e.buttons !== 1) return
-    const delta = e.clientX - sidebarResizeRef.current.x
+    // clientX 是缩放后视口坐标，除以 zoom 转布局像素，保证缩放字体后拖拽宽度变化与鼠标一致
+    const zoom = parseFloat(document.documentElement.style.zoom || '') || 1
+    const delta = (e.clientX - sidebarResizeRef.current.x) / zoom
     const width = Math.min(400, Math.max(160, sidebarResizeRef.current.width + delta))
     setSidebarWidth(width)
   }
@@ -153,7 +155,8 @@ export default function App() {
 
   const onTodoResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!todoResizeRef.current || e.buttons !== 1) return
-    const delta = todoResizeRef.current.x - e.clientX
+    const zoom = parseFloat(document.documentElement.style.zoom || '') || 1
+    const delta = (todoResizeRef.current.x - e.clientX) / zoom
     const width = Math.min(600, Math.max(220, todoResizeRef.current.width + delta))
     setTodoWidth(width)
   }
@@ -391,28 +394,30 @@ export default function App() {
     window.workbench.fs.showInFolder(p.path)
   }
 
-  // ===== 桌面视图专用操作（用绝对路径，兼容公共桌面文件；虚拟图标此电脑/回收站不可删除/重命名） =====
+  // ===== 桌面视图专用操作（用绝对路径，兼容公共桌面文件；虚拟图标此电脑/回收站不可删除） =====
   const desktopAbsPath = (entry: FileEntry): string => entry.path || `${currentDir}/${entry.name}`
 
-  // 桌面删除选中项（Delete 键 / 右键删除）：过滤虚拟图标，走回收站
-  const onDeleteDesktop = () => {
-    const targets = selectedFiles
-      .map((n) => files.find((f) => f.name === n))
-      .filter((f): f is FileEntry => f !== undefined && !f.virtual)
-    if (targets.length === 0) return
-    setConfirm({
-      title: '删除',
-      message: (
-        <>
-          确定删除选中的 <b>{targets.length}</b> 项吗？<br />
-          将移入回收站。
-        </>
-      ),
-      danger: true,
-      onConfirm: async () => {
-        await window.workbench.fs.removeMany(targets.map(desktopAbsPath))
-        clearSelection()
-        await refreshFiles()
+  // 桌面编辑模式「编辑」按钮：重命名快捷方式/文件（绝对路径，兼容公共桌面），不提供删除（避免误删真实桌面）
+  const onRenameDesktopEntry = (entry: FileEntry) => {
+    const target = desktopAbsPath(entry)
+    if (!target) return
+    const isFile = entry.type === 'file'
+    let base = entry.name
+    let ext = ''
+    if (isFile) {
+      const i = entry.name.lastIndexOf('.')
+      if (i > 0) {
+        base = entry.name.slice(0, i)
+        ext = entry.name.slice(i)
+      }
+    }
+    setPromptState({
+      title: '重命名',
+      defaultValue: base,
+      onSubmit: (name) => {
+        if (name === base) return
+        const finalName = isFile ? `${name.replace(/\.[^.]+$/, '')}${ext}` : name
+        void window.workbench.fs.rename(target, finalName).then(() => refreshFiles())
       }
     })
   }
@@ -561,7 +566,7 @@ export default function App() {
             />
           </>
         ) : activeNav === 'desktop' ? (
-          <DesktopView onOpen={openEntry} onDelete={onDeleteDesktop} />
+          <DesktopView onOpen={openEntry} onEdit={onRenameDesktopEntry} />
         ) : (
           <div className="library-view">
             <div className="library-view-empty">资料库功能开发中，敬请期待</div>
