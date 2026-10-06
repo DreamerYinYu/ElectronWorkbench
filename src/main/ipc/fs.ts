@@ -1,7 +1,6 @@
 import { ipcMain, shell, BrowserWindow, app } from 'electron'
 import { readdirSync, statSync, lstatSync, mkdirSync, renameSync, copyFileSync, readFileSync, writeFileSync, existsSync, rmSync, watch } from 'fs'
-import { mkdir, readFile, writeFile } from 'fs/promises'
-import { spawn, spawnSync } from 'child_process'
+import { mkdir, readFile } from 'fs/promises'
 import { createHash } from 'crypto'
 import { join, dirname, basename, extname, resolve, sep } from 'path'
 import { loadProjects } from '../config'
@@ -9,6 +8,7 @@ import { readSettings, readPinned, writePinned, WORKBENCH_DIR } from '../project
 import { validatePath, validateName } from '../paths'
 import { loadAppSettings } from '../appSettings'
 import { HIDDEN_ITEM_RULES } from '../hiddenItems'
+import { desktopDirs, desktopVirtualItems, desktopIconsVisibility, readShortcutTarget, extractIconsToFiles } from '../platform'
 import type { FileEntry, ProjectMeta } from '../types'
 
 // ==================== 真实图标提取（桌面视图用） ====================
@@ -71,71 +71,21 @@ function queueIconExtract(exePath: string, cacheKey: string): Promise<string> {
   })
 }
 
-/** 执行批量提取：生成 ps1（带 UTF-8 BOM，防中文路径乱码）→ spawn 一次 PowerShell → 读结果 PNG */
+/** 执行批量提取：收集提取任务（源 → 输出 PNG）交给平台函数，读回结果唤醒等待请求 */
 async function flushIconQueue(): Promise<void> {
   const batch = new Map(iconQueue)
   iconQueue.clear()
   iconBatchTimer = null
   if (batch.size === 0) return
 
-  try {
-    await mkdir(iconCacheDir(), { recursive: true })
-    // SHDefExtractIcon 直接读 PE 资源（不经过 Shell 图标缓存），请求 256px 大图标，避免 32px 放大模糊；
-    // 提取失败回退 ExtractAssociatedIcon（32px）。C# P/Invoke 定义放进单引号 here-string（字面量，不插值）。
-    const header = [
-      'Add-Type -AssemblyName System.Drawing',
-      "Add-Type -TypeDefinition @'\nusing System;\nusing System.Runtime.InteropServices;\npublic class WbIcon {\n  [DllImport(\"shell32.dll\", CharSet=CharSet.Unicode)]\n  public static extern int SHDefExtractIcon(string file, int index, uint flags, out IntPtr large, out IntPtr small, uint size);\n  [DllImport(\"user32.dll\")]\n  public static extern bool DestroyIcon(IntPtr h);\n}\n'@",
-      'function Save-WbIcon([string]$path, [string]$out) {',
-      '  try {',
-      '    $l=[IntPtr]::Zero; $s=[IntPtr]::Zero',
-      '    $r=[WbIcon]::SHDefExtractIcon($path, 0, 0, [ref]$l, [ref]$s, 0x01000100)',
-      '    if ($r -eq 0 -and $l -ne [IntPtr]::Zero) {',
-      '      $ic=[System.Drawing.Icon]::FromHandle($l)',
-      '      $bmp=$ic.ToBitmap()',
-      '      $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)',
-      '      $bmp.Dispose(); $ic.Dispose()',
-      '      [WbIcon]::DestroyIcon($l) | Out-Null',
-      '    } else {',
-      '      $ic=[System.Drawing.Icon]::ExtractAssociatedIcon($path)',
-      '      if ($ic) { $ic.ToBitmap().Save($out, [System.Drawing.Imaging.ImageFormat]::Png); $ic.Dispose() }',
-      '    }',
-      '  } catch {}',
-      '}'
-    ]
-    const lines: string[] = [...header]
-    const psSafe = (p: string): string => p.replace(/'/g, "''")
-    for (const [, waiters] of batch) {
-      for (const w of waiters) {
-        const out = psSafe(iconCacheFile(w.exePath))
-        const src = psSafe(w.exePath)
-        lines.push(`Save-WbIcon '${src}' '${out}'`)
-      }
+  await mkdir(iconCacheDir(), { recursive: true })
+  const items: { src: string; out: string }[] = []
+  for (const [, waiters] of batch) {
+    for (const w of waiters) {
+      items.push({ src: w.exePath, out: iconCacheFile(w.exePath) })
     }
-    const ps1 = join(iconCacheDir(), 'extract.ps1')
-    await writeFile(ps1, '\ufeff' + lines.join('\r\n'), 'utf-8')
-    await new Promise<void>((resolve) => {
-      const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1], {
-        windowsHide: true
-      })
-      const timer = setTimeout(() => {
-        try {
-          child.kill()
-        } catch {
-          // 已退出则忽略
-        }
-      }, 20000)
-      child.on('close', () => {
-        clearTimeout(timer)
-        resolve()
-      })
-      child.on('error', () => {
-        clearTimeout(timer)
-        resolve()
-      })
-    })
-  } catch {
-    // 脚本生成失败：所有等待请求按失败处理
   }
+  await extractIconsToFiles(items)
 
   for (const [cacheKey, waiters] of batch) {
     // 多个请求可能共享同一提取源（同名 lnk 场景极少，但按第一个 waiter 的源读结果即可）
@@ -175,12 +125,7 @@ async function getRealIcon(resolved: string): Promise<string> {
 
   // 快捷方式：解析目标路径，按目标类型取图标
   if (ext === 'lnk') {
-    let target = ''
-    try {
-      target = shell.readShortcutLink(resolved).target || ''
-    } catch {
-      // 坏 lnk：target 为空走默认提取
-    }
+    const target = readShortcutTarget(resolved)
     if (target && existsSync(target)) {
       if (statSync(target).isDirectory()) {
         // 目标是文件夹：getFileIcon 对文件夹提取正常
@@ -220,13 +165,9 @@ function projectOf(dir: string): ProjectMeta | undefined {
 
 /** 解析 .lnk 快捷方式指向的类型（文件夹/文件），用于桌面图标按目标类型显示；解析失败返回 undefined */
 function detectLnkTargetType(lnkPath: string): 'file' | 'folder' | undefined {
-  try {
-    const target = shell.readShortcutLink(lnkPath).target
-    if (target && existsSync(target)) {
-      return statSync(target).isDirectory() ? 'folder' : 'file'
-    }
-  } catch {
-    // 坏 lnk 或解析失败：返回 undefined
+  const target = readShortcutTarget(lnkPath)
+  if (target && existsSync(target)) {
+    return statSync(target).isDirectory() ? 'folder' : 'file'
   }
   return undefined
 }
@@ -307,64 +248,11 @@ async function dirSizeAsync(dir: string): Promise<number> {
 /** 同名冲突时的处理策略：替换（覆盖）或跳过（保留原有项） */
 type ConflictMode = 'replace' | 'skip'
 
-/** 桌面虚拟图标：命名空间对象（此电脑/回收站），双击用 shell 路径打开 */
-const DESKTOP_VIRTUAL_ITEMS: FileEntry[] = [
-  {
-    name: '此电脑',
-    type: 'file',
-    virtual: true,
-    shellPath: '::{20D04FE0-3AEA-1069-A2D8-08002B30309D}',
-    size: 0,
-    mtime: 0,
-    ext: ''
-  },
-  {
-    name: '回收站',
-    type: 'file',
-    virtual: true,
-    shellPath: '::{645FF040-5081-101B-9F08-00AA002F954E}',
-    size: 0,
-    mtime: 0,
-    ext: ''
-  }
-]
-
-/** 桌面虚拟图标的可见性缓存（读一次，系统「桌面图标设置」不常变） */
-let desktopIconsVisibility: { thisPc: boolean; recycleBin: boolean } | null = null
-
 /**
- * 读取系统「桌面图标设置」决定此电脑/回收站是否显示（HideDesktopIcons 注册表）。
- * 值名是带花括号的 CLSID；0x1=隐藏、其余（0x0/值不存在/读取失败）=显示，避免虚拟图标误消失。
- */
-function readDesktopIconsVisibility(): { thisPc: boolean; recycleBin: boolean } {
-  if (desktopIconsVisibility) return desktopIconsVisibility
-  const result = { thisPc: true, recycleBin: true }
-  try {
-    const key = 'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\HideDesktopIcons\\NewStartPanel'
-    const query = (clsid: string): boolean => {
-      const out = spawnSync('reg', ['query', key, '/v', clsid], { encoding: 'utf-8' })
-      // 仅当明确读到 0x1 时才隐藏，其余（0x0、值不存在、查询失败）都显示
-      if (out.status === 0 && /0x1\b/.test(out.stdout)) return false
-      return true
-    }
-    result.thisPc = query('{20D04FE0-3AEA-1069-A2D8-08002B30309D}')
-    result.recycleBin = query('{645FF040-5081-101B-9F08-00AA002F954E}')
-  } catch {
-    // 读注册表失败：都显示
-  }
-  desktopIconsVisibility = result
-  return result
-}
-
-/**
- * 列出真实桌面内容：用户桌面 + 公共桌面（去重，用户桌面优先）+ 虚拟图标（此电脑/回收站）。
- * 真实桌面是用户桌面与公共桌面（C:\Users\Public\Desktop）的合并视图。
+ * 列出真实桌面内容：用户桌面 +（Windows）公共桌面（去重，用户桌面优先）+ 虚拟图标（此电脑/回收站）。
+ * Windows 的真实桌面是用户桌面与公共桌面（C:\Users\Public\Desktop）的合并视图；macOS 仅用户桌面、无虚拟图标。
  */
 function listDesktopEntries(): FileEntry[] {
-  const userDesktop = app.getPath('desktop')
-  const publicRoot = process.env.PUBLIC || join(dirname(dirname(userDesktop)), 'Public')
-  const publicDesktop = join(publicRoot, 'Desktop')
-
   const seen = new Set<string>()
   const entries: FileEntry[] = []
 
@@ -396,12 +284,13 @@ function listDesktopEntries(): FileEntry[] {
     }
   }
 
-  pushDir(userDesktop)
-  pushDir(publicDesktop)
+  for (const dir of desktopDirs()) {
+    pushDir(dir)
+  }
 
-  // 虚拟图标置前（此电脑/回收站），按系统「桌面图标设置」过滤
-  const vis = readDesktopIconsVisibility()
-  const virtualItems = DESKTOP_VIRTUAL_ITEMS.filter((item) =>
+  // 虚拟图标置前（Windows 此电脑/回收站），按系统「桌面图标设置」过滤
+  const vis = desktopIconsVisibility()
+  const virtualItems = desktopVirtualItems().filter((item) =>
     item.shellPath?.includes('20D04FE0') ? vis.thisPc : item.shellPath?.includes('645FF040') ? vis.recycleBin : true
   )
   return [...virtualItems, ...entries]
@@ -731,12 +620,12 @@ export function registerFsIpc(): void {
     }
     projectWatchers.length = 0
 
-    // 桌面场景：真实桌面 = 用户桌面 + 公共桌面合并，两个目录都要监听
+    // 桌面场景：真实桌面（Windows 含公共桌面）合并，各目录都要监听
     const dirs: string[] = [validatePath(projectPath)]
     if (dirs[0] === app.getPath('desktop')) {
-      const publicRoot = process.env.PUBLIC || join(dirname(dirname(app.getPath('desktop'))), 'Public')
-      const publicDesktop = join(publicRoot, 'Desktop')
-      if (!dirs.includes(publicDesktop)) dirs.push(publicDesktop)
+      for (const d of desktopDirs()) {
+        if (!dirs.includes(d)) dirs.push(d)
+      }
     }
 
     for (const dir of dirs) {

@@ -185,13 +185,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // 窗口重新获得焦点时：同步项目清单（新增/删除项目）；桌面视图额外刷新文件列表
-  // （桌面目录不 watch，避免递归监听扰动 explorer 桌面；聚焦时刷新补上文件变化同步）
+  // 窗口重新获得焦点时：同步项目清单（新增/删除项目）；桌面视图额外刷新文件列表 + 壁纸
+  // （桌面目录不 watch，避免递归监听扰动 explorer 桌面；聚焦时刷新补上文件/壁纸变化同步）
   useEffect(() => {
     const onFocus = () => {
       rescanProjects()
       if (useWorkbench.getState().activeNav === 'desktop') {
         void useWorkbench.getState().refreshFiles()
+        void useWorkbench.getState().refreshWallpaper()
       }
     }
     window.addEventListener('focus', onFocus)

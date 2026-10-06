@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, ipcMain, protocol, net, Tray } from 'electron'
-import { join, dirname } from 'path'
+import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { registerProjectIpc } from './ipc/project'
 import { registerFsIpc } from './ipc/fs'
@@ -9,7 +9,8 @@ import { registerAppIpc } from './ipc/app'
 import { validatePath, registerExtraRoot } from './paths'
 import { loadState, saveState } from './state'
 import { appearanceArgs } from './appSettings'
-import { appIconPath, iconIcoPath } from './resources'
+import { appIconPath } from './resources'
+import { trayIconPath, desktopDirs } from './platform'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -139,7 +140,7 @@ function showMainWindow(): void {
 
 /** 创建系统托盘：左键单击打开主窗口，右键菜单打开/退出 */
 function createTray(): void {
-  tray = new Tray(iconIcoPath())
+  tray = new Tray(trayIconPath())
   tray.setToolTip('Workbench')
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -169,11 +170,10 @@ if (!gotTheLock) {
   Menu.setApplicationMenu(null)
 
   app.whenReady().then(() => {
-    // 系统桌面目录加入放行白名单（侧边栏「桌面」入口浏览用）
-    registerExtraRoot(app.getPath('desktop'))
-    // 公共桌面也放行：真实桌面 = 用户桌面 + 公共桌面（C:\Users\Public\Desktop）合并视图
-    const publicRoot = process.env.PUBLIC || join(dirname(dirname(app.getPath('desktop'))), 'Public')
-    registerExtraRoot(join(publicRoot, 'Desktop'))
+    // 桌面目录加入放行白名单（侧边栏「桌面」入口浏览用）：Windows 含用户桌面+公共桌面，macOS 仅用户桌面
+    for (const dir of desktopDirs()) {
+      registerExtraRoot(dir)
+    }
 
     registerProtocol()
     registerProjectIpc()

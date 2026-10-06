@@ -84,6 +84,7 @@ interface WorkbenchState {
   enterFolder: (name: string) => Promise<void>
   goToPath: (path: string) => Promise<void>
   refreshFiles: () => Promise<void>
+  refreshWallpaper: () => Promise<void>
   setView: (view: ViewMode) => void
   setSort: (key: SortKey) => void
   setSidebarWidth: (w: number) => void
@@ -220,10 +221,14 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
     })
     // 不 watch 桌面目录：递归监听 Shell 桌面目录会扰动 explorer 桌面（图标重绘/排列重置），
     // 桌面文件变化改由窗口聚焦时刷新（见 App.tsx onFocus）
-    // 每次进入桌面都重新拉壁纸，换壁纸后切走再切回即更新
+    await get().refreshWallpaper()
+    await get().refreshFiles()
+  },
+
+  // 重新拉取系统壁纸（进入桌面、窗口重新聚焦时调用），换壁纸后即时更新
+  refreshWallpaper: async () => {
     const wp = await window.workbench.getWallpaper()
     set({ wallpaper: wp })
-    await get().refreshFiles()
   },
 
   // 资料库入口（占位）：功能后续完善，先清空内容区

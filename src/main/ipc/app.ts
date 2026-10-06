@@ -1,13 +1,13 @@
 import { ipcMain, BrowserWindow, dialog, app, shell } from 'electron'
 import type { OpenDialogOptions } from 'electron'
-import { join, basename, extname } from 'path'
+import { join, basename } from 'path'
 import { readFileSync, existsSync } from 'fs'
-import { spawnSync } from 'child_process'
 import { loadAppSettings, saveAppSettings, resolveDefaultProjectsDir, appearanceArgs } from '../appSettings'
 import type { AppSettings } from '../appSettings'
 import { loadState, saveState } from '../state'
 import type { UiState } from '../state'
 import { appIconPath } from '../resources'
+import { readWallpaper } from '../platform'
 
 let settingsWindow: BrowserWindow | null = null
 let previewWindow: BrowserWindow | null = null
@@ -115,20 +115,9 @@ export function registerAppIpc(): void {
     return app.getPath('desktop')
   })
 
-  // 系统桌面壁纸：读注册表取壁纸路径，读文件转 base64 dataURL 返回（失败返回 null，前端用默认背景）
+  // 系统桌面壁纸（Windows 读注册表转 dataURL；macOS 暂不支持返回 null，前端用默认背景）
   ipcMain.handle('app:getWallpaper', (): string | null => {
-    try {
-      const out = spawnSync('reg', ['query', 'HKCU\\Control Panel\\Desktop', '/v', 'Wallpaper'], { encoding: 'utf-8' })
-      const m = out.stdout.match(/Wallpaper\s+REG_SZ\s+(.+)/)
-      if (!m) return null
-      const wallpaperPath = m[1].trim()
-      if (!wallpaperPath || !existsSync(wallpaperPath)) return null
-      const ext = extname(wallpaperPath).slice(1).toLowerCase()
-      const mime = ext === 'png' ? 'image/png' : ext === 'bmp' ? 'image/bmp' : 'image/jpeg'
-      return `data:${mime};base64,${readFileSync(wallpaperPath).toString('base64')}`
-    } catch {
-      return null
-    }
+    return readWallpaper()
   })
 
   // 应用图标（icon.png）转 base64 dataURL，标题栏 logo 展示用
