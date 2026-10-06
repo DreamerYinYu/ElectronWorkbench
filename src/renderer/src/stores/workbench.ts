@@ -13,6 +13,8 @@ import { typeLabel } from '../utils/format'
 function sortFiles(files: FileEntry[], key: SortKey, dir: SortDir): FileEntry[] {
   const mult = dir === 'asc' ? 1 : -1
   return [...files].sort((a, b) => {
+    // 虚拟桌面图标（此电脑/回收站）固定最前
+    if (!!a.virtual !== !!b.virtual) return a.virtual ? -1 : 1
     if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1
     if (key === 'name') return mult * a.name.localeCompare(b.name, 'zh-CN')
     if (key === 'size') {
@@ -52,6 +54,12 @@ interface WorkbenchState {
   currentDir: string
   breadcrumb: BreadcrumbItem[]
   files: FileEntry[]
+  /** 当前侧边栏导航区：项目 / 桌面 / 资料库 */
+  activeNav: 'project' | 'desktop' | 'library'
+  /** 系统桌面路径（桌面根目录），进入子文件夹后 currentDir 不再等于它，用于区分桌面根/子目录 */
+  desktopPath: string
+  /** 系统桌面壁纸（dataURL），桌面视图背景用 */
+  wallpaper: string | null
   view: ViewMode
   sortKey: SortKey
   sortDir: SortDir
@@ -67,6 +75,8 @@ interface WorkbenchState {
   init: () => Promise<void>
   rescanProjects: () => Promise<void>
   selectProject: (id: string) => Promise<void>
+  selectDesktop: () => Promise<void>
+  selectLibrary: () => Promise<void>
   createProject: (parentDir: string, name: string) => Promise<void>
   reorderProjects: (orderedIds: string[]) => Promise<void>
   renameProject: (id: string, newName: string) => Promise<void>
@@ -113,6 +123,9 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   currentDir: '',
   breadcrumb: [],
   files: [],
+  activeNav: 'project',
+  desktopPath: '',
+  wallpaper: null,
   view: 'grid',
   sortKey: 'name',
   sortDir: 'asc',
@@ -174,6 +187,7 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
     // 点击的已是当前项目、且正位于其根目录：跳过重新列目录/算大小/加载，避免无意义的重复工作
     if (id === get().currentProjectId && get().currentDir === (p?.path ?? '')) return
     set({
+      activeNav: 'project',
       currentProjectId: id,
       currentDir: p?.path ?? '',
       breadcrumb: p ? [{ name: p.name, path: p.path }] : [],
@@ -187,6 +201,45 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
     await get().refreshFiles()
     await get().loadTodos()
     await get().loadSettings()
+  },
+
+  // 切换到桌面视图：浏览系统桌面文件夹（格子排列 + 壁纸背景），无项目/待办
+  selectDesktop: async () => {
+    if (get().activeNav === 'desktop') return
+    const desktopPath = await window.workbench.getDesktopPath()
+    set({
+      activeNav: 'desktop',
+      desktopPath,
+      currentProjectId: null,
+      currentDir: desktopPath,
+      breadcrumb: [{ name: '桌面', path: desktopPath }],
+      selectedFiles: [],
+      anchorName: null,
+      todos: [],
+      editingTodoId: null
+    })
+    // 不 watch 桌面目录：递归监听 Shell 桌面目录会扰动 explorer 桌面（图标重绘/排列重置），
+    // 桌面文件变化改由窗口聚焦时刷新（见 App.tsx onFocus）
+    // 每次进入桌面都重新拉壁纸，换壁纸后切走再切回即更新
+    const wp = await window.workbench.getWallpaper()
+    set({ wallpaper: wp })
+    await get().refreshFiles()
+  },
+
+  // 资料库入口（占位）：功能后续完善，先清空内容区
+  selectLibrary: async () => {
+    if (get().activeNav === 'library') return
+    set({
+      activeNav: 'library',
+      currentProjectId: null,
+      currentDir: '',
+      breadcrumb: [],
+      files: [],
+      selectedFiles: [],
+      anchorName: null,
+      todos: [],
+      editingTodoId: null
+    })
   },
 
   createProject: async (parentDir, name) => {
@@ -261,6 +314,12 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
 
   refreshFiles: async () => {
     const dir = get().currentDir
+    // 桌面根目录：列出真实桌面（用户桌面 + 公共桌面 + 虚拟图标）；进入子文件夹后按普通目录列
+    if (get().activeNav === 'desktop' && dir === get().desktopPath) {
+      const files = await window.workbench.fs.listDesktop()
+      set({ files: sortFiles(files, get().sortKey, get().sortDir) })
+      return
+    }
     if (!dir) {
       set({ files: [] })
       return

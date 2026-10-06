@@ -45,6 +45,8 @@ textarea,
   --font-size-base: 13px;
   /* 全局统一字体：UI 与文本编辑器共用，禁止散落硬编码字体 */
   --font-family-base: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* 所有窗体顶部标题栏统一高度 */
+  --titlebar-height: 30px;
 }
 
 [data-theme='dark'] {
@@ -84,6 +86,10 @@ textarea,
   --primary-hover: #15803d;
   --primary-text: #ffffff;
   --primary-weak: #e6f5ec;
+  /* 侧边栏专属配色（参考 WorkBuddy「有风」：浅绿背景 + 浅绿高亮） */
+  --sidebar-bg: #f0f4ec;
+  --sidebar-hover: #e8eee2;
+  --sidebar-active: #e0e9d8;
 }
 
 /* 同行（暖橙，温暖童趣） */
@@ -169,7 +175,7 @@ select option {
 
 /* ===== 标题栏 ===== */
 .titlebar {
-  height: 40px;
+  height: var(--titlebar-height);
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -188,16 +194,22 @@ select option {
 }
 
 .logo {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--avatar-bg);
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text);
   font-size: var(--font-size-base);
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+.logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .titlebar-name {
@@ -257,25 +269,87 @@ select option {
 .sidebar {
   width: 224px;
   flex-shrink: 0;
-  background: var(--bg);
+  background: var(--sidebar-bg, var(--bg));
   display: flex;
   flex-direction: column;
+}
+
+/* 固定导航区（桌面/资料库）。注意：不能用 .nav-item——设置窗口导航已占用该类名（settings-nav），会互相覆盖 */
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 8px 0;
+}
+
+.side-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  font-family: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.side-nav-item:hover {
+  background: var(--sidebar-hover, var(--panel));
+  color: var(--text);
+}
+
+.side-nav-item.active {
+  background: var(--sidebar-active, var(--primary-weak));
+  color: var(--text);
+}
+
+.side-nav-icon {
+  display: flex;
+  width: 16px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 14px;
+  flex-shrink: 0;
+}
+
+/* 项目 item 左侧文件夹图标 */
+.project-icon {
+  display: flex;
+  width: 16px;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.project-item.active .project-icon {
+  color: var(--text);
 }
 
 .sidebar-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
+  gap: 9px;
+  padding: 14px 10px 10px 20px;
   line-height: 24px;
 }
 
-.sidebar-head > span {
+.sidebar-head-title {
   font-size: var(--font-size-base);
   font-weight: 600;
   letter-spacing: 0.4px;
   color: var(--text-faint);
   text-transform: uppercase;
+  flex: 1;
+  text-align: left;
 }
 
 .btn-add {
@@ -292,7 +366,7 @@ select option {
 }
 
 .btn-add:hover {
-  background: var(--panel);
+  background: var(--sidebar-hover, var(--panel));
   color: var(--text);
 }
 
@@ -312,7 +386,7 @@ select option {
 .project-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -321,7 +395,7 @@ select option {
 }
 
 .project-item:hover {
-  background: var(--panel);
+  background: var(--sidebar-hover, var(--panel));
 }
 
 /* 拖拽悬浮项（DragOverlay）：阴影 + 轻微放大，产生「挤进去」的悬浮感 */
@@ -338,7 +412,7 @@ body.is-dragging * {
 }
 
 .project-item.active {
-  background: var(--panel);
+  background: var(--sidebar-active, var(--panel));
 }
 
 .project-item.active .project-name {
@@ -381,13 +455,17 @@ body.is-dragging * {
   height: 24px;
   border-radius: 6px;
   flex-shrink: 0;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
 
 .project-item:hover .project-more {
-  display: flex;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .project-more:hover {
@@ -414,7 +492,7 @@ body.is-dragging * {
 }
 
 .btn-user:hover {
-  background: var(--panel);
+  background: var(--sidebar-hover, var(--panel));
 }
 
 .user-avatar {
@@ -544,7 +622,7 @@ body.is-dragging * {
 
 .resizer:hover::before,
 .resizer:active::before {
-  background: var(--primary-weak);
+  background: var(--scrollbar-thumb-hover);
 }
 
 .toolbar {
@@ -700,6 +778,123 @@ body.is-dragging * {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+}
+
+/* 桌面视图（苹果 Launchpad 风格大图标网格 + 壁纸） */
+.desktop-view {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  position: relative;
+  overflow: hidden;
+}
+
+.desktop-crumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.desktop-crumb-item {
+  cursor: default;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.desktop-crumb-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.desktop-crumb .current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.desktop-crumb-sep {
+  color: var(--text-faint);
+}
+
+.desktop-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 96px);
+  gap: 26px 20px;
+  align-content: start;
+  justify-content: center;
+}
+
+.desktop-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: default;
+  padding: 10px 6px;
+  border-radius: var(--radius);
+}
+
+.desktop-icon:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.desktop-icon.selected {
+  background: rgba(59, 130, 246, 0.32);
+}
+
+.desktop-icon.selected:hover {
+  background: rgba(59, 130, 246, 0.4);
+}
+
+.desktop-icon-img {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-real-icon {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+}
+
+.desktop-icon-label {
+  font-size: var(--font-size-base);
+  color: var(--text);
+  text-align: center;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* 资料库占位视图 */
+.library-view {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+}
+
+.library-view-empty {
+  font-size: var(--font-size-base);
+  color: var(--text-faint);
 }
 
 /* 可滚动的内容区（列表视图横向/纵向都可滚，表头在其外部固定） */
@@ -1508,6 +1703,16 @@ body.is-dragging * {
   background: transparent;
 }
 
+.ctx-label {
+  flex: 1;
+}
+
+.ctx-arrow {
+  color: var(--text-faint);
+  font-size: var(--font-size-base);
+  line-height: 1;
+}
+
 .ctx-divider {
   height: 1px;
   background: var(--border);
@@ -1854,7 +2059,7 @@ body.is-dragging * {
 }
 
 .settings-titlebar {
-  height: 40px;
+  height: var(--titlebar-height);
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   display: flex;

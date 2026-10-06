@@ -10,6 +10,9 @@ declare global {
       close: () => void
       initialAppearance: { fontSize: number; theme: string }
       getDefaultProjectsDir: () => Promise<string>
+      getDesktopPath: () => Promise<string>
+      getWallpaper: () => Promise<string | null>
+      getAppIcon: () => Promise<string>
       openSettings: (tab?: string) => Promise<void>
       selectDirectory: () => Promise<string | null>
       getDataPaths: () => Promise<{ configDir: string; projectsFolder: string }>
@@ -50,6 +53,7 @@ declare global {
       }
       fs: {
         listDir: (dir: string) => Promise<FileEntry[]>
+        listDesktop: () => Promise<FileEntry[]>
         mkdir: (parent: string, name: string) => Promise<string>
         createFile: (parent: string, name: string) => Promise<string>
         rename: (oldPath: string, newName: string) => Promise<string>
@@ -62,6 +66,7 @@ declare global {
         writeText: (target: string, content: string) => Promise<void>
         readBinary: (target: string) => Promise<string>
         readImage: (target: string) => Promise<string>
+        getIcon: (target: string) => Promise<string>
         openPath: (target: string) => Promise<string>
         showInFolder: (target: string) => Promise<void>
         stat: (target: string) => Promise<{ size: number; mtime: number; birthtime: number; type: 'file' | 'folder' }>

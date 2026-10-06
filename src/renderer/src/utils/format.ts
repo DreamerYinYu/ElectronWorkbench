@@ -55,3 +55,8 @@ export function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
+
+/** 桌面图标显示名：快捷方式（.lnk）去掉扩展名，与 Windows 资源管理器一致 */
+export function desktopDisplayName(name: string): string {
+  return name.toLowerCase().endsWith('.lnk') ? name.slice(0, -4) : name
+}

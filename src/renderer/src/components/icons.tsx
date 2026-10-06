@@ -141,3 +141,28 @@ export function PinIcon({ size = 15 }: IconProps) {
     </svg>
   )
 }
+
+/** 桌面虚拟图标「此电脑」：显示器造型 */
+export function ComputerIcon({ size = 48 }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size}>
+      <rect x="3" y="4" width="18" height="12.5" rx="1.5" fill="#5a8dee" />
+      <rect x="4" y="5" width="16" height="10.5" rx="0.8" fill="#a7c6ff" />
+      <path d="M9 19.5h6M12 16.5v3" stroke="#5a6b85" strokeWidth="1.4" strokeLinecap="round" />
+      <rect x="6" y="19" width="12" height="1.6" rx="0.8" fill="#5a6b85" />
+    </svg>
+  )
+}
+
+/** 桌面虚拟图标「回收站」：垃圾桶造型 */
+export function RecycleBinIcon({ size = 48 }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size}>
+      <path d="M5 7h14l-1 13.2a2 2 0 01-2 1.8H8a2 2 0 01-2-1.8L5 7z" fill="#9aa7b5" />
+      <path d="M9 7V5a1.5 1.5 0 011.5-1.5h3A1.5 1.5 0 0115 5v2" fill="#b7c2cd" />
+      <path d="M4 7h16" stroke="#6b7787" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M9 7V5.4M15 7V5.4" stroke="#6b7787" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M9.5 10.5v6M14.5 10.5v6" stroke="#eef2f6" strokeWidth="1.3" strokeLinecap="round" opacity="0.85" />
+    </svg>
+  )
+}

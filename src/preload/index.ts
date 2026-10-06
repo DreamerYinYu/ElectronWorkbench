@@ -18,6 +18,9 @@ const api = {
   close: (): void => ipcRenderer.send('window:close'),
   initialAppearance,
   getDefaultProjectsDir: (): Promise<string> => ipcRenderer.invoke('app:getDefaultProjectsDir'),
+  getDesktopPath: (): Promise<string> => ipcRenderer.invoke('app:getDesktopPath'),
+  getWallpaper: (): Promise<string | null> => ipcRenderer.invoke('app:getWallpaper'),
+  getAppIcon: (): Promise<string> => ipcRenderer.invoke('app:getAppIcon'),
   openSettings: (tab?: string): Promise<void> => ipcRenderer.invoke('app:openSettings', tab),
   selectDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectDirectory'),
   getDataPaths: (): Promise<{ configDir: string; projectsFolder: string }> =>
@@ -73,6 +76,7 @@ const api = {
 
   fs: {
     listDir: (dir: string) => ipcRenderer.invoke('fs:listDir', dir),
+    listDesktop: () => ipcRenderer.invoke('fs:listDesktop'),
     mkdir: (parent: string, name: string) => ipcRenderer.invoke('fs:mkdir', parent, name),
     createFile: (parent: string, name: string) => ipcRenderer.invoke('fs:createFile', parent, name),
     rename: (oldPath: string, newName: string) => ipcRenderer.invoke('fs:rename', oldPath, newName),
@@ -87,6 +91,7 @@ const api = {
     writeText: (target: string, content: string) => ipcRenderer.invoke('fs:writeText', target, content),
     readBinary: (target: string) => ipcRenderer.invoke('fs:readBinary', target),
     readImage: (target: string) => ipcRenderer.invoke('fs:readImage', target),
+    getIcon: (target: string) => ipcRenderer.invoke('fs:getIcon', target),
     openPath: (target: string) => ipcRenderer.invoke('fs:openPath', target),
     showInFolder: (target: string) => ipcRenderer.invoke('fs:showInFolder', target),
     stat: (target: string) => ipcRenderer.invoke('fs:stat', target),

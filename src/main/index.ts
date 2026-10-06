@@ -1,12 +1,12 @@
 import { app, BrowserWindow, Menu, ipcMain, protocol, net, Tray } from 'electron'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { pathToFileURL } from 'url'
 import { registerProjectIpc } from './ipc/project'
 import { registerFsIpc } from './ipc/fs'
 import { registerTodoIpc } from './ipc/todo'
 import { registerArchiveIpc } from './ipc/archive'
 import { registerAppIpc } from './ipc/app'
-import { validatePath } from './paths'
+import { validatePath, registerExtraRoot } from './paths'
 import { loadState, saveState } from './state'
 import { appearanceArgs } from './appSettings'
 import { appIconPath, iconIcoPath } from './resources'
@@ -22,6 +22,13 @@ protocol.registerSchemesAsPrivileged([
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true }
   }
 ])
+
+// 应用显示名：Windows 任务栏/跳转列表等场景显示（dev 下未设置会显示 Electron）
+app.setName('Workbench')
+// Windows 任务栏关联标识（AppUserModelID），与打包 appId 一致，让任务栏右键菜单正确归类并显示应用名/图标
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.dreameryin.workbench')
+}
 
 // 禁用硬件加速：避免无 GPU/远程桌面等环境下 GPU 进程崩溃
 app.disableHardwareAcceleration()
@@ -162,6 +169,12 @@ if (!gotTheLock) {
   Menu.setApplicationMenu(null)
 
   app.whenReady().then(() => {
+    // 系统桌面目录加入放行白名单（侧边栏「桌面」入口浏览用）
+    registerExtraRoot(app.getPath('desktop'))
+    // 公共桌面也放行：真实桌面 = 用户桌面 + 公共桌面（C:\Users\Public\Desktop）合并视图
+    const publicRoot = process.env.PUBLIC || join(dirname(dirname(app.getPath('desktop'))), 'Public')
+    registerExtraRoot(join(publicRoot, 'Desktop'))
+
     registerProtocol()
     registerProjectIpc()
     registerFsIpc()

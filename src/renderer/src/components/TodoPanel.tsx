@@ -96,6 +96,7 @@ export default function TodoPanel({ width }: { width?: number }) {
 
   const [input, setInput] = useState('')
   const currentProjectId = useWorkbench((s) => s.currentProjectId)
+  const activeNav = useWorkbench((s) => s.activeNav)
 
   // 本地排序列表：拖拽时实时重排，松手后持久化
   const [items, setItems] = useState<TodoItem[]>(todos)
@@ -205,7 +206,7 @@ export default function TodoPanel({ width }: { width?: number }) {
       <div className="todo-add">
         <input
           className="todo-input"
-          placeholder={currentProjectId ? '添加待办事项，回车确认' : '先创建项目，再添加待办事项'}
+          placeholder={currentProjectId ? '添加待办事项，回车确认' : activeNav === 'project' ? '选择项目后可添加待办事项' : '待办事项仅项目模式下可用'}
           value={input}
           disabled={!currentProjectId}
           onChange={(e) => setInput(e.target.value)}

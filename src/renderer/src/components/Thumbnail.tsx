@@ -65,11 +65,11 @@ export default function Thumbnail({ entry, size = 52 }: { entry: FileEntry; size
   const t = fileType(entry.ext)
 
   if (entry.type === 'file' && t === 'image') {
-    const path = `${currentDir}/${entry.name}`
+    const path = entry.path || `${currentDir}/${entry.name}`
     return <img className="thumb-img" src={thumbUrl(path)} alt={entry.name} loading="lazy" />
   }
   if (entry.type === 'file' && t === 'video') {
-    const path = `${currentDir}/${entry.name}`
+    const path = entry.path || `${currentDir}/${entry.name}`
     return <VideoThumb path={path} size={size} />
   }
   return <FileIcon type={entry.type} ext={entry.ext} link={entry.link} size={size} />

@@ -2,8 +2,15 @@ import { resolve, sep } from 'path'
 import { loadProjects } from './config'
 import { readSettings } from './projectFiles'
 
+/** 额外放行的根目录（如系统桌面）：不在项目内但允许浏览/操作 */
+const extraRoots = new Set<string>()
+
+export function registerExtraRoot(dir: string): void {
+  extraRoots.add(resolve(dir))
+}
+
 export function allowedRoots(): string[] {
-  return loadProjects().flatMap((p) => {
+  const roots = loadProjects().flatMap((p) => {
     const roots = [resolve(p.path)]
     const settings = readSettings(p.path)
     for (const link of settings.externalLinks) {
@@ -11,6 +18,8 @@ export function allowedRoots(): string[] {
     }
     return roots
   })
+  for (const root of extraRoots) roots.push(root)
+  return roots
 }
 
 export function validatePath(target: string): string {

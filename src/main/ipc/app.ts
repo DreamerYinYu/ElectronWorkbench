@@ -1,6 +1,8 @@
 import { ipcMain, BrowserWindow, dialog, app, shell } from 'electron'
 import type { OpenDialogOptions } from 'electron'
-import { join, basename } from 'path'
+import { join, basename, extname } from 'path'
+import { readFileSync, existsSync } from 'fs'
+import { spawnSync } from 'child_process'
 import { loadAppSettings, saveAppSettings, resolveDefaultProjectsDir, appearanceArgs } from '../appSettings'
 import type { AppSettings } from '../appSettings'
 import { loadState, saveState } from '../state'
@@ -105,7 +107,40 @@ function openPreviewWindow(filePath: string): void {
 
 export function registerAppIpc(): void {
   // 启动时同步开机自启状态到系统，确保设置与系统一致
-  app.setLoginItemSettings({ openAtLogin: loadAppSettings().autoStart })
+  // 注意：未打包（dev）时 electron.exe 无法作为自启目标，强制不注册，否则重启后会弹出 electron 报错窗口
+  app.setLoginItemSettings({ openAtLogin: app.isPackaged && loadAppSettings().autoStart })
+
+  // 系统桌面目录路径（侧边栏「桌面」入口浏览用）
+  ipcMain.handle('app:getDesktopPath', (): string => {
+    return app.getPath('desktop')
+  })
+
+  // 系统桌面壁纸：读注册表取壁纸路径，读文件转 base64 dataURL 返回（失败返回 null，前端用默认背景）
+  ipcMain.handle('app:getWallpaper', (): string | null => {
+    try {
+      const out = spawnSync('reg', ['query', 'HKCU\\Control Panel\\Desktop', '/v', 'Wallpaper'], { encoding: 'utf-8' })
+      const m = out.stdout.match(/Wallpaper\s+REG_SZ\s+(.+)/)
+      if (!m) return null
+      const wallpaperPath = m[1].trim()
+      if (!wallpaperPath || !existsSync(wallpaperPath)) return null
+      const ext = extname(wallpaperPath).slice(1).toLowerCase()
+      const mime = ext === 'png' ? 'image/png' : ext === 'bmp' ? 'image/bmp' : 'image/jpeg'
+      return `data:${mime};base64,${readFileSync(wallpaperPath).toString('base64')}`
+    } catch {
+      return null
+    }
+  })
+
+  // 应用图标（icon.png）转 base64 dataURL，标题栏 logo 展示用
+  ipcMain.handle('app:getAppIcon', (): string => {
+    try {
+      const iconPath = appIconPath()
+      if (!existsSync(iconPath)) return ''
+      return `data:image/png;base64,${readFileSync(iconPath).toString('base64')}`
+    } catch {
+      return ''
+    }
+  })
 
   ipcMain.handle('app:getDefaultProjectsDir', () => {
     // 优先用设置里保存的项目文件夹，未设置时才回退到文档目录
@@ -149,8 +184,8 @@ export function registerAppIpc(): void {
 
   ipcMain.handle('app:saveSettings', (_e, settings: AppSettings) => {
     saveAppSettings(settings)
-    // 同步开机自启设置到系统（写注册表/登录项）
-    app.setLoginItemSettings({ openAtLogin: settings.autoStart })
+    // 同步开机自启设置到系统（写注册表/登录项）；未打包（dev）时不注册，避免 electron.exe 被写入登录项
+    app.setLoginItemSettings({ openAtLogin: app.isPackaged && settings.autoStart })
     // 广播给所有窗口（主窗口实时同步主题/字号）
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) w.webContents.send('appearance:changed', settings)

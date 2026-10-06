@@ -25,6 +25,26 @@ function layoutPoint(e: { clientX: number; clientY: number }): { x: number; y: n
   return { x: e.clientX / zoom, y: e.clientY / zoom }
 }
 
+const ICON_DESKTOP = (
+  <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2.5" width="12" height="8.5" rx="1.5" />
+    <path d="M6 14h4M8 11v3" />
+  </svg>
+)
+
+const ICON_LIBRARY = (
+  <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 4.3C7.2 3.4 6 3 4.6 3H2.5v9.5h2.4c1.3 0 2.4.3 3.1 1.2.7-.9 1.8-1.2 3.1-1.2h2.4V3h-2.1C10 3 8.8 3.4 8 4.3z" />
+    <path d="M8 4.5v9" />
+  </svg>
+)
+
+const ICON_FOLDER = (
+  <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 4.2c0-.7.6-1.2 1.2-1.2h2.6l1.4 1.6h5.6c.7 0 1.2.5 1.2 1.2v6c0 .7-.6 1.2-1.2 1.2H3.2c-.7 0-1.2-.5-1.2-1.2V4.2z" />
+  </svg>
+)
+
 function ProjectItem({
   p,
   active,
@@ -55,7 +75,7 @@ function ProjectItem({
       {...attributes}
       {...listeners}
     >
-      <div className="project-dot">{p.name[0]}</div>
+      <span className="project-icon">{ICON_FOLDER}</span>
       <div className="project-meta">
         <div className="project-name">{p.name}</div>
       </div>
@@ -101,6 +121,9 @@ export default function ProjectSidebar({
   const selectProject = useWorkbench((s) => s.selectProject)
   const reorderProjects = useWorkbench((s) => s.reorderProjects)
   const selectedFiles = useWorkbench((s) => s.selectedFiles)
+  const activeNav = useWorkbench((s) => s.activeNav)
+  const selectDesktop = useWorkbench((s) => s.selectDesktop)
+  const selectLibrary = useWorkbench((s) => s.selectLibrary)
 
   // 本地排序列表：拖拽时实时重排（挤进去的动画），松手后持久化
   const [items, setItems] = useState<ProjectMeta[]>(projects)
@@ -168,11 +191,31 @@ export default function ProjectSidebar({
 
   return (
     <aside className="sidebar" style={{ width }}>
+      <div className="nav-section">
+        <button
+          className={`side-nav-item ${activeNav === 'desktop' ? 'active' : ''}`}
+          onClick={() => void selectDesktop()}
+        >
+          <span className="side-nav-icon">{ICON_DESKTOP}</span>
+          <span>桌面</span>
+        </button>
+        <button
+          className={`side-nav-item ${activeNav === 'library' ? 'active' : ''}`}
+          onClick={() => void selectLibrary()}
+        >
+          <span className="side-nav-icon">{ICON_LIBRARY}</span>
+          <span>资料库</span>
+        </button>
+      </div>
+      <div className="sidebar-divider" />
+
       <div className="sidebar-head">
-        <span>项目</span>
+        <span className="sidebar-head-title">项目</span>
         <button className="btn-add" title="新建项目" onClick={onNewProject}>
-          <svg viewBox="0 0 16 16" width="14" height="14">
-            <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1.5 4.5A1.5 1.5 0 013 3h2.5l1.5 1.5H13a1.5 1.5 0 011.5 1.5v6A1.5 1.5 0 0113 13.5H3a1.5 1.5 0 01-1.5-1.5v-7.5z" />
+            <circle cx="11.8" cy="3.6" r="2.3" fill="currentColor" stroke="none" />
+            <path d="M11.8 2.7v1.8M10.9 3.6h1.8" stroke="var(--panel)" strokeWidth="1.1" />
           </svg>
         </button>
       </div>
@@ -207,7 +250,7 @@ export default function ProjectSidebar({
         <DragOverlay modifiers={[zoomModifier]}>
           {activeProject ? (
             <div className="project-item dragging-overlay">
-              <div className="project-dot">{activeProject.name[0]}</div>
+              <span className="project-icon">{ICON_FOLDER}</span>
               <div className="project-meta">
                 <div className="project-name">{activeProject.name}</div>
               </div>

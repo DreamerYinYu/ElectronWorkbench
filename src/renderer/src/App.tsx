@@ -3,6 +3,7 @@ import { useWorkbench } from './stores/workbench'
 import ProjectSidebar from './components/ProjectSidebar'
 import FileBrowser from './components/FileBrowser'
 import TodoPanel from './components/TodoPanel'
+import DesktopView from './components/DesktopView'
 import { PinIcon } from './components/icons'
 import { Menu } from './components/Menu'
 import type { MenuItem } from './components/Menu'
@@ -113,6 +114,7 @@ export default function App() {
   const setSidebarWidth = useWorkbench((s) => s.setSidebarWidth)
   const setTodoWidth = useWorkbench((s) => s.setTodoWidth)
   const breadcrumb = useWorkbench((s) => s.breadcrumb)
+  const activeNav = useWorkbench((s) => s.activeNav)
 
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [compressOpen, setCompressOpen] = useState(false)
@@ -183,11 +185,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // 窗口重新获得焦点时，仅同步项目清单（新增/删除项目）；文件列表由 fs.watch 实时同步，
-  // 不再在此重复 refreshFiles（避免托盘打开/切回窗口时无谓地重新列目录+递归算文件夹大小）
+  // 窗口重新获得焦点时：同步项目清单（新增/删除项目）；桌面视图额外刷新文件列表
+  // （桌面目录不 watch，避免递归监听扰动 explorer 桌面；聚焦时刷新补上文件变化同步）
   useEffect(() => {
     const onFocus = () => {
       rescanProjects()
+      if (useWorkbench.getState().activeNav === 'desktop') {
+        void useWorkbench.getState().refreshFiles()
+      }
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
@@ -209,8 +214,22 @@ export default function App() {
       onSetLink(entry)
       return
     }
-    if (entry.type === 'folder') enterFolder(entry.name)
-    else window.workbench.preview.open(`${currentDir}/${entry.name}`)
+    // 虚拟桌面图标（此电脑/回收站）：用 Shell 命名空间路径打开（::CLSID 非文件路径，走不校验路径的顶层 openPath）
+    if (entry.virtual && entry.shellPath) {
+      void window.workbench.openPath(entry.shellPath)
+      return
+    }
+    const targetPath = entry.path || `${currentDir}/${entry.name}`
+    // 桌面模式：模拟真实电脑桌面，文件/快捷方式/文件夹都直接用系统默认方式打开（文件夹新开资源管理器），不视图内导航、不展开面包屑
+    if (activeNav === 'desktop') {
+      void window.workbench.fs.openPath(targetPath)
+      return
+    }
+    if (entry.type === 'folder') {
+      enterFolder(entry.name)
+      return
+    }
+    window.workbench.preview.open(targetPath)
   }
 
   const onRenameProject = (p: ProjectMeta) => {
@@ -371,6 +390,32 @@ export default function App() {
     window.workbench.fs.showInFolder(p.path)
   }
 
+  // ===== 桌面视图专用操作（用绝对路径，兼容公共桌面文件；虚拟图标此电脑/回收站不可删除/重命名） =====
+  const desktopAbsPath = (entry: FileEntry): string => entry.path || `${currentDir}/${entry.name}`
+
+  // 桌面删除选中项（Delete 键 / 右键删除）：过滤虚拟图标，走回收站
+  const onDeleteDesktop = () => {
+    const targets = selectedFiles
+      .map((n) => files.find((f) => f.name === n))
+      .filter((f): f is FileEntry => f !== undefined && !f.virtual)
+    if (targets.length === 0) return
+    setConfirm({
+      title: '删除',
+      message: (
+        <>
+          确定删除选中的 <b>{targets.length}</b> 项吗？<br />
+          将移入回收站。
+        </>
+      ),
+      danger: true,
+      onConfirm: async () => {
+        await window.workbench.fs.removeMany(targets.map(desktopAbsPath))
+        clearSelection()
+        await refreshFiles()
+      }
+    })
+  }
+
   const onSetLink = async (entry: FileEntry) => {
     const dir = await window.workbench.selectDirectory()
     if (!dir) return
@@ -482,18 +527,7 @@ export default function App() {
           onRenameProject={onRenameProject}
           onDeleteProject={onDeleteProject}
         />
-        <FileBrowser
-          onPreview={openEntry}
-          onContextMenu={(entry, anchor) => setCtxMenu({ entry, anchor })}
-          onRename={onRenameEntry}
-          onCopy={() => onCopyOrCut('copy')}
-          onCut={() => onCopyOrCut('cut')}
-          onPaste={() => void onPaste(currentDir)}
-          onDelete={onDelete}
-          canPaste={Boolean(clipboard && clipboard.paths.length > 0)}
-        />
-        <TodoPanel width={todoWidth} />
-        {/* 拖拽分割线：绝对定位覆盖在项目区/待办区交界处，不占布局宽度，hover 高亮、可拖拽 */}
+        {/* 侧边栏/内容区拖拽分割线：所有模式（项目/桌面/资料库）都渲染，hover 高亮、可拖拽调侧边栏宽度 */}
         <div
           className="resizer resizer-left"
           style={{ left: sidebarWidth }}
@@ -502,14 +536,36 @@ export default function App() {
           onPointerUp={onSidebarResizeEnd}
           onPointerCancel={onSidebarResizeEnd}
         />
-        <div
-          className="resizer resizer-right"
-          style={{ right: todoWidth }}
-          onPointerDown={onTodoResizeStart}
-          onPointerMove={onTodoResizeMove}
-          onPointerUp={onTodoResizeEnd}
-          onPointerCancel={onTodoResizeEnd}
-        />
+        {activeNav === 'project' ? (
+          <>
+            <FileBrowser
+              onPreview={openEntry}
+              onContextMenu={(entry, anchor) => setCtxMenu({ entry, anchor })}
+              onRename={onRenameEntry}
+              onCopy={() => onCopyOrCut('copy')}
+              onCut={() => onCopyOrCut('cut')}
+              onPaste={() => void onPaste(currentDir)}
+              onDelete={onDelete}
+              canPaste={Boolean(clipboard && clipboard.paths.length > 0)}
+            />
+            <TodoPanel width={todoWidth} />
+            {/* 项目区/待办区拖拽分割线：仅项目模式（有待办区） */}
+            <div
+              className="resizer resizer-right"
+              style={{ right: todoWidth }}
+              onPointerDown={onTodoResizeStart}
+              onPointerMove={onTodoResizeMove}
+              onPointerUp={onTodoResizeEnd}
+              onPointerCancel={onTodoResizeEnd}
+            />
+          </>
+        ) : activeNav === 'desktop' ? (
+          <DesktopView onOpen={openEntry} onDelete={onDeleteDesktop} />
+        ) : (
+          <div className="library-view">
+            <div className="library-view-empty">资料库功能开发中，敬请期待</div>
+          </div>
+        )}
       </div>
 
       {ctxMenu && (

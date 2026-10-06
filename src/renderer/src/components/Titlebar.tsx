@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react'
 
 export default function Titlebar({ title, tag }: { title: string; tag?: string }) {
   const [maximized, setMaximized] = useState(false)
+  const [icon, setIcon] = useState('')
 
   useEffect(() => {
     window.workbench.onMaximizeChange(setMaximized)
+    window.workbench.getAppIcon().then(setIcon)
   }, [])
 
   return (
     <header className="titlebar">
       <div className="titlebar-left">
-        <div className="logo">W</div>
+        <div className="logo">{icon ? <img src={icon} alt="" /> : 'W'}</div>
         <span className="titlebar-name">{title}</span>
         {tag && <span className="titlebar-tag">{tag}</span>}
       </div>
