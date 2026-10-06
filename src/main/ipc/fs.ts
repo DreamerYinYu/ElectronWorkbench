@@ -165,9 +165,13 @@ function projectOf(dir: string): ProjectMeta | undefined {
 
 /** 解析 .lnk 快捷方式指向的类型（文件夹/文件），用于桌面图标按目标类型显示；解析失败返回 undefined */
 function detectLnkTargetType(lnkPath: string): 'file' | 'folder' | undefined {
-  const target = readShortcutTarget(lnkPath)
-  if (target && existsSync(target)) {
-    return statSync(target).isDirectory() ? 'folder' : 'file'
+  try {
+    const target = readShortcutTarget(lnkPath)
+    if (target && existsSync(target)) {
+      return statSync(target).isDirectory() ? 'folder' : 'file'
+    }
+  } catch {
+    // 快捷方式解析失败（目标损坏/不存在/无权限）时忽略，不让单个文件拖垮整个桌面列表
   }
   return undefined
 }
@@ -258,7 +262,14 @@ function listDesktopEntries(): FileEntry[] {
 
   const pushDir = (dir: string): void => {
     if (!existsSync(dir)) return
-    for (const d of readdirSync(dir, { withFileTypes: true })) {
+    let dirents
+    try {
+      dirents = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      // 目录读取失败（被占用/无权限等）：跳过该目录，不让单个目录拖垮整个桌面列表
+      return
+    }
+    for (const d of dirents) {
       if (d.name.toLowerCase() === 'desktop.ini') continue
       const full = join(dir, d.name)
       let st
@@ -348,7 +359,13 @@ function movePath(src: string, dest: string): void {
 export function registerFsIpc(): void {
   // 列出真实桌面（用户桌面 + 公共桌面 + 虚拟图标），桌面视图专用
   ipcMain.handle('fs:listDesktop', (): FileEntry[] => {
-    return listDesktopEntries()
+    try {
+      return listDesktopEntries()
+    } catch (e) {
+      // 整体失败兜底：返回空列表并打印真实原因，避免 IPC 未处理异常（dev 终端可见日志）
+      console.error('[desktop] listDesktop failed:', e)
+      return []
+    }
   })
 
   ipcMain.handle('fs:listDir', (event, dir: string): FileEntry[] => {

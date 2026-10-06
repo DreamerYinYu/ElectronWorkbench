@@ -416,7 +416,8 @@ export default function App() {
       defaultValue: base,
       onSubmit: (name) => {
         if (name === base) return
-        const finalName = isFile ? `${name.replace(/\.[^.]+$/, '')}${ext}` : name
+        // 真实采用用户输入的名字，仅补回原扩展名（.lnk/.exe 必须保留，否则破坏文件类型），不剥离用户输入里的点
+        const finalName = isFile ? `${name}${ext}` : name
         void window.workbench.fs.rename(target, finalName).then(() => refreshFiles())
       }
     })

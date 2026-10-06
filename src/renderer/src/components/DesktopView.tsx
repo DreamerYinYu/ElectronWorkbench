@@ -38,8 +38,12 @@ function itemKey(entry: FileEntry): string {
   return entry.path || entry.shellPath || entry.name
 }
 
-/** 解析桌面图标：layout.icons 里已有的用其网格坐标，新文件追加默认位置 */
-function resolveIcons(files: FileEntry[], layout: DesktopLayout | null): { key: string; entry: FileEntry; col: number; row: number }[] {
+/** 解析桌面图标：layout.icons 里已有的用其网格坐标，新文件从空位起依次追加（不与已有坐标/小组件重叠） */
+function resolveIcons(
+  files: FileEntry[],
+  layout: DesktopLayout | null,
+  cols: number
+): { key: string; entry: FileEntry; col: number; row: number }[] {
   const byKey = new Map<string, FileEntry>()
   for (const f of files) byKey.set(itemKey(f), f)
   const dockSet = new Set(layout?.dock ?? [])
@@ -56,16 +60,15 @@ function resolveIcons(files: FileEntry[], layout: DesktopLayout | null): { key: 
     }
   }
 
-  // 新文件默认按 A-Z 名称排序填充（与「自动排列」同一基准，避免首次切自定义时顺序跳变）
+  // 新文件默认按 A-Z 名称排序，从第一个空位起依次排（不与已有图标/小组件重叠）
   const newFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-  let n = result.length
+  const occupied = collectOccupiedSlots(result, layout?.widgets ?? [])
   for (const f of newFiles) {
     const k = itemKey(f)
     if (placed.has(k) || dockSet.has(k)) continue
-    const COLS = 8
-    result.push({ key: k, entry: f, col: n % COLS, row: Math.floor(n / COLS) })
+    const slot = findFreeSlot(occupied, cols)
+    result.push({ key: k, entry: f, col: slot.col, row: slot.row })
     placed.add(k)
-    n++
   }
 
   return result
@@ -93,9 +96,10 @@ function isSlotOccupied(
   return false
 }
 
-/** 拆开重叠：保持数组顺序，同一格（col/row）的图标依次往后找空位（横向 ++col，行尾换行），返回无重叠的 icons */
-function dedupeIconPositions(icons: DesktopIconPos[], cols: number): DesktopIconPos[] {
-  const occupied = new Set<string>()
+/** 拆开重叠：保持数组顺序，同一格（col/row）的图标依次往后找空位（横向 ++col，行尾换行），返回无重叠的 icons。
+ *  小组件也视为占位（预填 occupied），切自定义时图标与小组件重叠会被一起挤开 */
+function dedupeIconPositions(icons: DesktopIconPos[], widgets: DesktopWidget[], cols: number): DesktopIconPos[] {
+  const occupied = collectOccupiedSlots([], widgets)
   return icons.map((p) => {
     let col = p.col
     let row = p.row
@@ -109,6 +113,57 @@ function dedupeIconPositions(icons: DesktopIconPos[], cols: number): DesktopIcon
     occupied.add(`${col},${row}`)
     return col === p.col && row === p.row ? p : { ...p, col, row }
   })
+}
+
+/** 收集已占格子（icons + 小组件展开后的每个格子），key 为 "col,row" */
+function collectOccupiedSlots(icons: DesktopIconPos[], widgets: DesktopWidget[]): Set<string> {
+  const occupied = new Set<string>()
+  for (const p of icons) occupied.add(`${p.col},${p.row}`)
+  for (const w of widgets) {
+    for (let dc = 0; dc < w.w; dc++) {
+      for (let dr = 0; dr < w.h; dr++) occupied.add(`${w.col + dc},${w.row + dr}`)
+    }
+  }
+  return occupied
+}
+
+/** 从 (0,0) 起按行优先找第一个空位，返回坐标并把该格标记为已占 */
+function findFreeSlot(occupied: Set<string>, cols: number): { col: number; row: number } {
+  let col = 0
+  let row = 0
+  while (occupied.has(`${col},${row}`)) {
+    col++
+    if (col >= cols) {
+      col = 0
+      row++
+    }
+  }
+  occupied.add(`${col},${row}`)
+  return { col, row }
+}
+
+/** 从 (0,0) 起按行优先找第一个能容纳 w×h 的连续空块，返回左上角坐标并把整块标记为已占 */
+function findFreeArea(
+  occupied: Set<string>,
+  cols: number,
+  w: number,
+  h: number
+): { col: number; row: number } {
+  const cw = Math.min(w, cols)
+  for (let row = 0; ; row++) {
+    for (let col = 0; col + cw <= cols; col++) {
+      let ok = true
+      for (let dc = 0; dc < cw && ok; dc++) {
+        for (let dr = 0; dr < h && ok; dr++) {
+          if (occupied.has(`${col + dc},${row + dr}`)) ok = false
+        }
+      }
+      if (ok) {
+        for (let dc = 0; dc < cw; dc++) for (let dr = 0; dr < h; dr++) occupied.add(`${col + dc},${row + dr}`)
+        return { col, row }
+      }
+    }
+  }
 }
 
 interface DragState {
@@ -173,30 +228,37 @@ export default function DesktopView({
     return () => clearTimeout(t)
   }, [editing, setEditing])
 
+  // 列数/列宽自适应容器：列数按最小单元算，列宽均分铺满（左右对称）。
+  // 注意：必须定义在「新文件同步」useEffect 之前——其依赖数组 render 时同步求值，cols 后置会触发 TDZ 错误
+  const usableW = Math.max(0, viewportW - PADDING * 2)
+  const cols = Math.max(1, Math.floor((usableW + GAP) / (CELL + GAP)))
+  const colW = (usableW - (cols - 1) * GAP) / cols
+
   // 新文件同步 + 死图标清理（icons 始终只含有效文件；增删双向同步）
   useEffect(() => {
     if (!layout) return
+    // 文件列表为空（加载中 / listDesktop 失败）时跳过同步，避免把 icons 误清空导致桌面空白、布局丢失
+    if (files.length === 0) return
     const fileKeys = new Set<string>()
     for (const f of files) fileKeys.add(itemKey(f))
     const dockSet = new Set(layout.dock ?? [])
     const icons = layout.icons.filter((p) => fileKeys.has(p.key))
     let changed = icons.length !== layout.icons.length
     const existing = new Set(icons.map((p) => p.key))
-    // 新文件默认按 A-Z 名称排序填充（与「自动排列」同一基准），避免首次切自定义时顺序跳变
+    // 新文件按 A-Z 名称排序，从第一个空位起依次追加（不与已有图标/小组件坐标撞车）
     const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-    let n = icons.length
+    const occupied = collectOccupiedSlots(icons.filter((p) => !dockSet.has(p.key)), layout.widgets)
     for (const f of sortedFiles) {
       const k = itemKey(f)
       if (!existing.has(k) && !dockSet.has(k)) {
-        const COLS = 8
-        icons.push({ key: k, col: n % COLS, row: Math.floor(n / COLS) })
+        const slot = findFreeSlot(occupied, cols)
+        icons.push({ key: k, col: slot.col, row: slot.row })
         existing.add(k)
-        n++
         changed = true
       }
     }
     if (changed) void saveLayout({ ...layout, icons })
-  }, [files, layout, saveLayout])
+  }, [files, layout, saveLayout, cols])
 
   // 测量容器宽度 + 内容区可视高度，列数/列宽/canvas 最小高度随之自适应
   useEffect(() => {
@@ -215,26 +277,24 @@ export default function DesktopView({
     return () => ro.disconnect()
   }, [])
 
-  // 列数/列宽自适应容器：列数按最小单元算，列宽均分铺满（左右对称）
-  const usableW = Math.max(0, viewportW - PADDING * 2)
-  const cols = Math.max(1, Math.floor((usableW + GAP) / (CELL + GAP)))
-  const colW = (usableW - (cols - 1) * GAP) / cols
-
-  const icons = useMemo(() => resolveIcons(files, layout), [files, layout])
+  const icons = useMemo(() => resolveIcons(files, layout, cols), [files, layout, cols])
   const widgets = layout?.widgets ?? []
   const autoArrange = layout?.autoArrange ?? true
 
-  // 最终摆放位置：自动排列 = A-Z 按名称排序 + 按当前列数流式排；自定义 = 用户拖拽的 col/row
+  // 最终摆放位置：自动排列 = A-Z 按名称排序 + 按当前列数流式排（跳过小组件占用的格子）；
+  // 自定义 = 用户拖拽的 col/row
   const placed = useMemo(() => {
     const list = autoArrange
       ? [...icons].sort((a, b) => a.entry.name.localeCompare(b.entry.name, 'zh-CN'))
       : icons
-    return list.map((item, i) => ({
-      ...item,
-      col: autoArrange ? i % cols : item.col,
-      row: autoArrange ? Math.floor(i / cols) : item.row
-    }))
-  }, [icons, autoArrange, cols])
+    if (!autoArrange) return list.map((item) => ({ ...item }))
+    // 自动排列：小组件与图标共用网格，流式排图标时跳过小组件占用的格子，避免叠加
+    const occupied = collectOccupiedSlots([], widgets)
+    return list.map((item) => {
+      const slot = findFreeSlot(occupied, cols)
+      return { ...item, col: slot.col, row: slot.row }
+    })
+  }, [icons, autoArrange, cols, widgets])
 
   const cellX = (col: number): number => PADDING + col * (colW + GAP)
   const cellY = (row: number): number => PADDING + row * (CELL + GAP)
@@ -427,22 +487,16 @@ export default function DesktopView({
       if (d) {
         if (d.moved) {
           const l = layout ?? { icons: [], widgets: [], dock: [] }
-          const zoom = parseFloat(document.documentElement.style.zoom || '') || 1
           const dockRoot = document.querySelector<HTMLElement>('.desktop-dock')
-          const cEl = canvasRef.current
           // 「是否落在 Dock」用鼠标 clientY 是否越过 Dock 顶边判定，而非 elementFromPoint 像素命中
           // （拖到 Dock 下方/窗外时命中不稳定，导致有时去 Dock、有时不去）
           const inDock = dockRoot ? e.clientY >= dockRoot.getBoundingClientRect().top : false
           // 落位直接按 ghost 左上角（d.x/d.y 即原图标左上角 + 位移，canvas 布局坐标）吸附网格，
-          // 与 ghost 视觉位置严格一致，不会偏半格
+          // 与 ghost 视觉位置严格一致，不会偏半格。
+          // 注意：这里不再按「Dock 顶边」压行号——画布可滚动，下方行是合法位置；
+          // ghost 的视觉边界已由拖拽时的 clamp（底边不越 Dock 底边）保证
           const col = Math.max(0, Math.round((d.x - PADDING) / (colW + GAP)))
-          let row = Math.max(0, Math.round((d.y - PADDING) / (CELL + GAP)))
-          // 底部 clamp：落位图标底部不越过 Dock 顶边——松手在 Dock 下方/窗外时，落到 Dock 上方最近格
-          if (dockRoot && cEl) {
-            const dockTop = (dockRoot.getBoundingClientRect().top - cEl.getBoundingClientRect().top) / zoom
-            const maxRow = Math.max(0, Math.floor((dockTop - PADDING - CELL) / (CELL + GAP)))
-            row = Math.min(row, maxRow)
-          }
+          const row = Math.max(0, Math.round((d.y - PADDING) / (CELL + GAP)))
 
           if (d.kind === 'icon') {
             if (d.from === 'grid' && inDock) {
@@ -456,12 +510,11 @@ export default function DesktopView({
               const auto = layout?.autoArrange ?? true
               if (auto || !isSlotOccupied(l, d.key, col, row, 1, 1)) {
                 const dock = l.dock.filter((k) => k !== d.key)
-                // 自动排列下 col/row 用追加位置（流式填充），避免切换自定义排列时重叠
-                const nextCol = auto ? l.icons.length % cols : col
-                const nextRow = auto ? Math.floor(l.icons.length / cols) : row
+                // 自动排列下 col/row 取第一个空位（不与已有图标/小组件坐标撞车，避免切自定义时重叠）
+                const slot = auto ? findFreeSlot(collectOccupiedSlots(l.icons, l.widgets), cols) : { col, row }
                 const icons = l.icons.some((p) => p.key === d.key)
-                  ? l.icons.map((p) => (p.key === d.key ? { ...p, col: nextCol, row: nextRow } : p))
-                  : [...l.icons, { key: d.key, col: nextCol, row: nextRow }]
+                  ? l.icons.map((p) => (p.key === d.key ? { ...p, col: slot.col, row: slot.row } : p))
+                  : [...l.icons, { key: d.key, col: slot.col, row: slot.row }]
                 void saveLayout({ ...l, icons, dock })
               }
             } else if (d.from === 'grid' && !inDock) {
@@ -543,13 +596,17 @@ export default function DesktopView({
   const addWidget = (type: DesktopWidget['type']): void => {
     const l: DesktopLayout = layout ?? { icons: [], widgets: [], dock: [] }
     const size = WIDGET_SIZE[type]
+    // 小组件与图标共用网格：新小组件放到第一个能容纳它的空块（跳过已有小组件 + 图标当前显示位置），避免叠加
+    const occupied = collectOccupiedSlots([], l.widgets)
+    for (const p of placed) occupied.add(`${p.col},${p.row}`)
+    const slot = findFreeArea(occupied, cols, size.w, size.h)
     const widget: DesktopWidget = {
       id: `${type}-${Date.now()}`,
       type,
       w: size.w,
       h: size.h,
-      col: (l.widgets.length % 4) * 2,
-      row: Math.floor(l.widgets.length / 4) * 2 + 3
+      col: slot.col,
+      row: slot.row
     }
     void saveLayout({ ...l, widgets: [...l.widgets, widget] })
   }
@@ -588,7 +645,7 @@ export default function DesktopView({
     const l = layout ?? { icons: [], widgets: [], dock: [] }
     if (!v) {
       // 切到自定义：保留用户上次摆放，但拆开重叠（自动模式下新文件/移回追加的坐标可能撞上历史坐标）
-      void saveLayout({ ...l, icons: dedupeIconPositions(l.icons, cols), autoArrange: false })
+      void saveLayout({ ...l, icons: dedupeIconPositions(l.icons, l.widgets, cols), autoArrange: false })
     } else {
       // 切到自动：仅切标志，坐标不动（自动排列忽略坐标，运行时 A-Z 计算）
       void saveLayout({ ...l, autoArrange: true })
@@ -696,14 +753,22 @@ export default function DesktopView({
             )
           })}
           {widgets.map((w) => {
-            const x = cellX(w.col)
+            // 视觉对齐：图标在格内居中（两侧留 (colW-ICON_SIZE)/2），小组件左右各缩进同样留白，
+            // 让小组件的可视边缘与首/末列图标的可视边缘对齐（苹果式吸附图标边缘，而非格子边缘）
+            const iconPad = (colW - ICON_SIZE) / 2
+            const x = cellX(w.col) + iconPad
             const y = cellY(w.row)
             return (
               <div
                 key={w.id}
                 data-widget-id={w.id}
                 className={`desktop-widget-item ${editing ? 'jiggling' : ''}`}
-                style={{ left: x, top: y, width: w.w * colW + (w.w - 1) * GAP, height: w.h * CELL + (w.h - 1) * GAP }}
+                style={{
+                  left: x,
+                  top: y,
+                  width: w.w * colW + (w.w - 1) * GAP - iconPad * 2,
+                  height: w.h * CELL + (w.h - 1) * GAP
+                }}
               >
                 <div className="desktop-widget-holder">
                   <WidgetCard widget={w} />
