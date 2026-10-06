@@ -97,6 +97,7 @@ function persistUi(): void {
   persistTimer = setTimeout(() => {
     const s = useWorkbench.getState()
     window.workbench.state.saveUi({
+      activeNav: s.activeNav,
       currentProjectId: s.currentProjectId,
       view: s.view,
       sortKey: s.sortKey,
@@ -226,10 +227,19 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
       todoWidth: typeof ui.todoWidth === 'number' ? ui.todoWidth : 296
     })
     const target = projects.find((p) => p.id === ui.currentProjectId)
-    if (target) {
+    // 恢复上次停留的导航项；首次启动（activeNav 未保存）且无上次项目 → 默认桌面
+    if (ui.activeNav === 'desktop') {
+      await get().selectDesktop()
+    } else if (ui.activeNav === 'library') {
+      await get().selectLibrary()
+    } else if (target) {
       await get().selectProject(target.id)
-    } else if (projects.length > 0) {
-      await get().selectProject(projects[0].id)
+    } else if (ui.activeNav === 'project') {
+      // 显式停留在项目视图但上次项目已失效：有项目选第一个，无项目保持空项目视图
+      if (projects.length > 0) await get().selectProject(projects[0].id)
+    } else {
+      // 首次启动 / 旧版本（未保存 activeNav）且无上次项目：默认桌面
+      await get().selectDesktop()
     }
   },
 
@@ -297,6 +307,7 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
     await get().refreshWallpaper()
     await get().loadDesktopLayout()
     await get().refreshFiles()
+    persistUi()
   },
 
   // 重新拉取系统壁纸（进入桌面、窗口重新聚焦时调用），换壁纸后即时更新
@@ -336,6 +347,7 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
       todos: [],
       editingTodoId: null
     })
+    persistUi()
   },
 
   createProject: async (parentDir, name) => {

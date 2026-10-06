@@ -1,6 +1,8 @@
 import { loadSection, saveSection } from './store'
 
 export interface UiState {
+  /** 上次停留的导航项：项目 / 桌面 / 资料库。undefined = 旧版本或首次启动（未保存过） */
+  activeNav?: 'project' | 'desktop' | 'library'
   currentProjectId: string | null
   view: 'grid' | 'list'
   sortKey: string

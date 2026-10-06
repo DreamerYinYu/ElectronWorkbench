@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkbench } from '../stores/workbench'
 import DesktopIcon from './DesktopIcon'
-import WidgetCard from './WidgetCard'
 import { Menu } from './Menu'
 import type { MenuItem } from './Menu'
 import { desktopDisplayName } from '../utils/format'
-import type { FileEntry, DesktopLayout, DesktopWidget, DesktopIconPos } from '../types'
+import type { FileEntry, DesktopLayout, DesktopIconPos } from '../types'
 
 /** 图标单元最小尺寸（列宽自适应容器，此值为最小列宽） */
 const CELL = 96
@@ -19,20 +18,6 @@ const GAP = 14
 const PADDING = 20
 /** 按下移动超过该像素判定为拖拽 */
 const DRAG_THRESHOLD = 5
-
-const WIDGET_SIZE: Record<DesktopWidget['type'], { w: number; h: number }> = {
-  clock: { w: 2, h: 2 },
-  todos: { w: 4, h: 2 },
-  projects: { w: 4, h: 2 },
-  system: { w: 2, h: 2 }
-}
-
-const WIDGET_LABELS: Record<DesktopWidget['type'], string> = {
-  clock: '时钟',
-  todos: '待办',
-  projects: '最近项目',
-  system: '系统状态'
-}
 
 function itemKey(entry: FileEntry): string {
   return entry.path || entry.shellPath || entry.name
@@ -60,9 +45,9 @@ function resolveIcons(
     }
   }
 
-  // 新文件默认按 A-Z 名称排序，从第一个空位起依次排（不与已有图标/小组件重叠）
+  // 新文件默认按 A-Z 名称排序，从第一个空位起依次排（不与已有图标重叠）
   const newFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-  const occupied = collectOccupiedSlots(result, layout?.widgets ?? [])
+  const occupied = collectOccupiedSlots(result)
   for (const f of newFiles) {
     const k = itemKey(f)
     if (placed.has(k) || dockSet.has(k)) continue
@@ -74,7 +59,7 @@ function resolveIcons(
   return result
 }
 
-/** 判断目标网格区域是否已被其他图标/小组件占用（排除 selfKey 与 dock，网格坐标） */
+/** 判断目标网格区域是否已被其他图标占用（排除 selfKey 与 dock，网格坐标） */
 function isSlotOccupied(
   layout: DesktopLayout,
   selfKey: string,
@@ -89,17 +74,12 @@ function isSlotOccupied(
     if (dockSet.has(p.key)) continue
     if (p.col >= col && p.col < col + w && p.row >= row && p.row < row + h) return true
   }
-  for (const wd of layout.widgets) {
-    if (wd.id === selfKey) continue
-    if (col < wd.col + wd.w && col + w > wd.col && row < wd.row + wd.h && row + h > wd.row) return true
-  }
   return false
 }
 
-/** 拆开重叠：保持数组顺序，同一格（col/row）的图标依次往后找空位（横向 ++col，行尾换行），返回无重叠的 icons。
- *  小组件也视为占位（预填 occupied），切自定义时图标与小组件重叠会被一起挤开 */
-function dedupeIconPositions(icons: DesktopIconPos[], widgets: DesktopWidget[], cols: number): DesktopIconPos[] {
-  const occupied = collectOccupiedSlots([], widgets)
+/** 拆开重叠：保持数组顺序，同一格（col/row）的图标依次往后找空位（横向 ++col，行尾换行），返回无重叠的 icons */
+function dedupeIconPositions(icons: DesktopIconPos[], cols: number): DesktopIconPos[] {
+  const occupied = new Set<string>()
   return icons.map((p) => {
     let col = p.col
     let row = p.row
@@ -115,15 +95,10 @@ function dedupeIconPositions(icons: DesktopIconPos[], widgets: DesktopWidget[], 
   })
 }
 
-/** 收集已占格子（icons + 小组件展开后的每个格子），key 为 "col,row" */
-function collectOccupiedSlots(icons: DesktopIconPos[], widgets: DesktopWidget[]): Set<string> {
+/** 收集已占格子（icons 的每个格子），key 为 "col,row" */
+function collectOccupiedSlots(icons: DesktopIconPos[]): Set<string> {
   const occupied = new Set<string>()
   for (const p of icons) occupied.add(`${p.col},${p.row}`)
-  for (const w of widgets) {
-    for (let dc = 0; dc < w.w; dc++) {
-      for (let dr = 0; dr < w.h; dr++) occupied.add(`${w.col + dc},${w.row + dr}`)
-    }
-  }
   return occupied
 }
 
@@ -142,36 +117,11 @@ function findFreeSlot(occupied: Set<string>, cols: number): { col: number; row: 
   return { col, row }
 }
 
-/** 从 (0,0) 起按行优先找第一个能容纳 w×h 的连续空块，返回左上角坐标并把整块标记为已占 */
-function findFreeArea(
-  occupied: Set<string>,
-  cols: number,
-  w: number,
-  h: number
-): { col: number; row: number } {
-  const cw = Math.min(w, cols)
-  for (let row = 0; ; row++) {
-    for (let col = 0; col + cw <= cols; col++) {
-      let ok = true
-      for (let dc = 0; dc < cw && ok; dc++) {
-        for (let dr = 0; dr < h && ok; dr++) {
-          if (occupied.has(`${col + dc},${row + dr}`)) ok = false
-        }
-      }
-      if (ok) {
-        for (let dc = 0; dc < cw; dc++) for (let dr = 0; dr < h; dr++) occupied.add(`${col + dc},${row + dr}`)
-        return { col, row }
-      }
-    }
-  }
-}
-
 interface DragState {
-  kind: 'icon' | 'widget'
+  kind: 'icon'
   key: string
   entry?: FileEntry
-  widget?: DesktopWidget
-  /** 拖拽来源：grid（网格图标/小组件）或 dock（Dock 图标） */
+  /** 拖拽来源：grid（网格图标）或 dock（Dock 图标） */
   from: 'grid' | 'dock'
   /** ghost 左上角（canvas 布局坐标，= 原图标左上角 + 鼠标位移） */
   origX: number
@@ -216,6 +166,7 @@ export default function DesktopView({
   const anchorRef = useRef<string | null>(null)
   const dragRef = useRef<DragState | null>(null)
   const suppressClickRef = useRef(false)
+  const dockInnerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000)
@@ -245,9 +196,9 @@ export default function DesktopView({
     const icons = layout.icons.filter((p) => fileKeys.has(p.key))
     let changed = icons.length !== layout.icons.length
     const existing = new Set(icons.map((p) => p.key))
-    // 新文件按 A-Z 名称排序，从第一个空位起依次追加（不与已有图标/小组件坐标撞车）
+    // 新文件按 A-Z 名称排序，从第一个空位起依次追加（不与已有图标坐标撞车）
     const sortedFiles = [...files].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-    const occupied = collectOccupiedSlots(icons.filter((p) => !dockSet.has(p.key)), layout.widgets)
+    const occupied = collectOccupiedSlots(icons.filter((p) => !dockSet.has(p.key)))
     for (const f of sortedFiles) {
       const k = itemKey(f)
       if (!existing.has(k) && !dockSet.has(k)) {
@@ -278,23 +229,19 @@ export default function DesktopView({
   }, [])
 
   const icons = useMemo(() => resolveIcons(files, layout, cols), [files, layout, cols])
-  const widgets = layout?.widgets ?? []
   const autoArrange = layout?.autoArrange ?? true
 
-  // 最终摆放位置：自动排列 = A-Z 按名称排序 + 按当前列数流式排（跳过小组件占用的格子）；
-  // 自定义 = 用户拖拽的 col/row
+  // 最终摆放位置：自动排列 = A-Z 按名称排序 + 按当前列数流式排；自定义 = 用户拖拽的 col/row
   const placed = useMemo(() => {
     const list = autoArrange
       ? [...icons].sort((a, b) => a.entry.name.localeCompare(b.entry.name, 'zh-CN'))
       : icons
-    if (!autoArrange) return list.map((item) => ({ ...item }))
-    // 自动排列：小组件与图标共用网格，流式排图标时跳过小组件占用的格子，避免叠加
-    const occupied = collectOccupiedSlots([], widgets)
-    return list.map((item) => {
-      const slot = findFreeSlot(occupied, cols)
-      return { ...item, col: slot.col, row: slot.row }
-    })
-  }, [icons, autoArrange, cols, widgets])
+    return list.map((item, i) => ({
+      ...item,
+      col: autoArrange ? i % cols : item.col,
+      row: autoArrange ? Math.floor(i / cols) : item.row
+    }))
+  }, [icons, autoArrange, cols])
 
   const cellX = (col: number): number => PADDING + col * (colW + GAP)
   const cellY = (row: number): number => PADDING + row * (CELL + GAP)
@@ -302,10 +249,9 @@ export default function DesktopView({
   const canvasHeight = useMemo(() => {
     let maxBottom = 0
     for (const i of placed) maxBottom = Math.max(maxBottom, i.row * (CELL + GAP) + CELL)
-    for (const w of widgets) maxBottom = Math.max(maxBottom, w.row * (CELL + GAP) + w.h * CELL + (w.h - 1) * GAP)
     // 最小高度 = 内容区可视高度（图标少时撑满可视区，可框选/右键）；内容更多时按实际内容高度（可滚动）
     return Math.max(viewportH, maxBottom + PADDING)
-  }, [placed, widgets, viewportH])
+  }, [placed, viewportH])
 
   const dockEntries = useMemo(() => {
     const byKey = new Map(files.map((f) => [itemKey(f), f]))
@@ -324,26 +270,8 @@ export default function DesktopView({
       // 图标按下：进入拖拽（自动排列下只能拖到 Dock，网格内不换位；自定义排列下可自由换位）
       e.preventDefault()
       const key = itemEl.getAttribute('data-key')
-      const widgetId = itemEl.getAttribute('data-widget-id')
       let st: DragState | null = null
-      if (widgetId) {
-        const w = (layout?.widgets ?? []).find((x) => x.id === widgetId)
-        if (w) {
-          st = {
-            kind: 'widget',
-            key: widgetId,
-            widget: w,
-            from: 'grid',
-            origX: cellX(w.col),
-            origY: cellY(w.row),
-            startX: e.clientX,
-            startY: e.clientY,
-            moved: false,
-            x: cellX(w.col),
-            y: cellY(w.row)
-          }
-        }
-      } else if (key) {
+      if (key) {
         const entry = files.find((f) => itemKey(f) === key)
         // 拖拽起点用「实际显示位置」（placed 的 col/row），自动排列下是 A-Z 流式排、自定义排列下是用户摆放坐标，
         // 不能用 layout.icons 的坐标（自动排列时两者不一致，会导致 ghost 起点偏移）
@@ -444,8 +372,7 @@ export default function DesktopView({
             const dockEl = document.querySelector<HTMLElement>('.desktop-dock')
             if (dockEl) {
               const dockBottom = (dockEl.getBoundingClientRect().bottom - cRect.top) / zoom
-              // 底部约束用「ghost 图标底边」（6 padding-top + 图标，固定值）而非实测整体高度（含文字）。
-              // 若用整体高度：按下 Dock 图标时 ghost 含文字、底部低于 Dock 底边会被推高，且首帧兜底高度≠实测高度，造成「上跳又回落」抖动。
+              // 底部约束用「ghost 图标底边」（6 padding-top + 图标，固定值）而非实测整体高度（含文字），避免首帧兜底高度≠实测高度造成抖动
               y = Math.min(y, dockBottom - (6 + ICON_SIZE))
             }
           }
@@ -510,8 +437,8 @@ export default function DesktopView({
               const auto = layout?.autoArrange ?? true
               if (auto || !isSlotOccupied(l, d.key, col, row, 1, 1)) {
                 const dock = l.dock.filter((k) => k !== d.key)
-                // 自动排列下 col/row 取第一个空位（不与已有图标/小组件坐标撞车，避免切自定义时重叠）
-                const slot = auto ? findFreeSlot(collectOccupiedSlots(l.icons, l.widgets), cols) : { col, row }
+                // 自动排列下 col/row 取第一个空位（不与已有图标坐标撞车，避免切自定义时重叠）
+                const slot = auto ? findFreeSlot(collectOccupiedSlots(l.icons), cols) : { col, row }
                 const icons = l.icons.some((p) => p.key === d.key)
                   ? l.icons.map((p) => (p.key === d.key ? { ...p, col: slot.col, row: slot.row } : p))
                   : [...l.icons, { key: d.key, col: slot.col, row: slot.row }]
@@ -527,14 +454,6 @@ export default function DesktopView({
               }
             }
             // from='dock' 且松手仍在 Dock：留在 Dock，不移动
-          } else {
-            // 小组件（仅网格）：吸附
-            const w = d.widget?.w ?? 1
-            const h = d.widget?.h ?? 1
-            if (!isSlotOccupied(l, d.key, col, row, w, h)) {
-              const widgets = l.widgets.map((x) => (x.id === d.key ? { ...x, col, row } : x))
-              void saveLayout({ ...l, widgets })
-            }
           }
         }
         dragRef.current = null
@@ -588,29 +507,6 @@ export default function DesktopView({
     anchorRef.current = key
   }
 
-  const removeWidget = (w: DesktopWidget): void => {
-    const l: DesktopLayout = layout ?? { icons: [], widgets: [], dock: [] }
-    void saveLayout({ ...l, widgets: l.widgets.filter((x) => x.id !== w.id) })
-  }
-
-  const addWidget = (type: DesktopWidget['type']): void => {
-    const l: DesktopLayout = layout ?? { icons: [], widgets: [], dock: [] }
-    const size = WIDGET_SIZE[type]
-    // 小组件与图标共用网格：新小组件放到第一个能容纳它的空块（跳过已有小组件 + 图标当前显示位置），避免叠加
-    const occupied = collectOccupiedSlots([], l.widgets)
-    for (const p of placed) occupied.add(`${p.col},${p.row}`)
-    const slot = findFreeArea(occupied, cols, size.w, size.h)
-    const widget: DesktopWidget = {
-      id: `${type}-${Date.now()}`,
-      type,
-      w: size.w,
-      h: size.h,
-      col: slot.col,
-      row: slot.row
-    }
-    void saveLayout({ ...l, widgets: [...l.widgets, widget] })
-  }
-
   const removeFromDock = (entry: FileEntry): void => {
     const l: DesktopLayout = layout ?? { icons: [], widgets: [], dock: [] }
     const key = itemKey(entry)
@@ -623,16 +519,7 @@ export default function DesktopView({
     setEditMenu({ x: rect.left / zoom, y: rect.bottom / zoom })
   }
 
-  const editMenuItems: MenuItem[] = [
-    { label: '编辑页面', onClick: () => setEditing(true) },
-    {
-      label: '添加小组件',
-      children: (Object.keys(WIDGET_LABELS) as DesktopWidget['type'][]).map((t) => ({
-        label: WIDGET_LABELS[t],
-        onClick: () => addWidget(t)
-      }))
-    }
-  ]
+  const editMenuItems: MenuItem[] = [{ label: '编辑页面', onClick: () => setEditing(true) }]
 
   // 「查看」菜单：自动排列 / 自定义排列（互斥勾选，对齐 Windows 桌面）
   const openViewMenu = (e: React.MouseEvent): void => {
@@ -644,8 +531,15 @@ export default function DesktopView({
   const setAutoArrange = (v: boolean): void => {
     const l = layout ?? { icons: [], widgets: [], dock: [] }
     if (!v) {
-      // 切到自定义：保留用户上次摆放，但拆开重叠（自动模式下新文件/移回追加的坐标可能撞上历史坐标）
-      void saveLayout({ ...l, icons: dedupeIconPositions(l.icons, l.widgets, cols), autoArrange: false })
+      // 存储坐标若超出当前网格（写入时窗口更宽，之后缩小了），视为过期坐标——
+      // 此时以「当前自动排列的显示布局」（A-Z × 当前列数）重建，避免出现「自动 7 列、切手动 17 列」；
+      // 坐标未过期则保留用户上次摆放，仅拆开重叠
+      const stale = l.icons.some((p) => p.col >= cols)
+      const dockSet = new Set(l.dock ?? [])
+      const icons = stale
+        ? placed.filter((p) => !dockSet.has(p.key)).map((p) => ({ key: p.key, col: p.col, row: p.row }))
+        : dedupeIconPositions(l.icons, cols)
+      void saveLayout({ ...l, icons, autoArrange: false })
     } else {
       // 切到自动：仅切标志，坐标不动（自动排列忽略坐标，运行时 A-Z 计算）
       void saveLayout({ ...l, autoArrange: true })
@@ -664,7 +558,7 @@ export default function DesktopView({
   const zoom = parseFloat(document.documentElement.style.zoom || '') || 1
 
   const dragPos = drag?.moved
-    ? { kind: drag.kind, key: drag.key, x: drag.x, y: drag.y, entry: drag.entry, widget: drag.widget }
+    ? { kind: drag.kind, key: drag.key, x: drag.x, y: drag.y, entry: drag.entry }
     : null
 
   // ghost 用 fixed 定位（覆盖 Dock），需把 canvas 布局坐标（d.x/d.y = 原图标左上角 + 位移）换算成视口布局坐标
@@ -752,60 +646,64 @@ export default function DesktopView({
               </div>
             )
           })}
-          {widgets.map((w) => {
-            // 视觉对齐：图标在格内居中（两侧留 (colW-ICON_SIZE)/2），小组件左右各缩进同样留白，
-            // 让小组件的可视边缘与首/末列图标的可视边缘对齐（苹果式吸附图标边缘，而非格子边缘）
-            const iconPad = (colW - ICON_SIZE) / 2
-            const x = cellX(w.col) + iconPad
-            const y = cellY(w.row)
-            return (
-              <div
-                key={w.id}
-                data-widget-id={w.id}
-                className={`desktop-widget-item ${editing ? 'jiggling' : ''}`}
-                style={{
-                  left: x,
-                  top: y,
-                  width: w.w * colW + (w.w - 1) * GAP - iconPad * 2,
-                  height: w.h * CELL + (w.h - 1) * GAP
-                }}
-              >
-                <div className="desktop-widget-holder">
-                  <WidgetCard widget={w} />
+        </div>
+      </div>
+
+      {/* 底部 Dock（图标盛不下时左右滚动：滚轮横滚 + 按住空白处拖动；裁剪层固定在背景条内 18px 的
+          圆角竖切线处，图标滚出在此被裁，绝不露出背景条外；图标本身仍可拖出/拖入） */}
+      <div className="desktop-dock">
+        <div
+          className="desktop-dock-bar"
+          onWheel={(e) => {
+            const el = dockInnerRef.current
+            if (el && el.scrollWidth > el.clientWidth) {
+              el.scrollLeft += e.deltaY + e.deltaX
+            }
+          }}
+          onMouseDown={(e) => {
+            if (e.button !== 0) return
+            const t = e.target instanceof Element ? e.target : null
+            if (t && t.closest('.desktop-dock-icon')) return // 图标：交给图标拖拽
+            // 空白处：按住左右拖动滚动 Dock
+            const el = dockInnerRef.current
+            if (!el) return
+            const startX = e.clientX
+            const startScroll = el.scrollLeft
+            e.preventDefault()
+            const onMove = (ev: MouseEvent): void => {
+              el.scrollLeft = startScroll - (ev.clientX - startX)
+            }
+            const onUp = (): void => {
+              window.removeEventListener('mousemove', onMove)
+              window.removeEventListener('mouseup', onUp)
+            }
+            window.addEventListener('mousemove', onMove)
+            window.addEventListener('mouseup', onUp)
+          }}
+        >
+          <div className="desktop-dock-clip">
+            <div className="desktop-dock-inner" ref={dockInnerRef}>
+              {dockEntries.map((entry) => (
+                <div
+                  key={itemKey(entry)}
+                  className={`desktop-dock-icon ${editing ? 'jiggling' : ''}`}
+                  onMouseDown={(e) => onDockMouseDown(entry, e)}
+                  onDoubleClick={() => {
+                    if (!editing) onOpen(entry)
+                  }}
+                >
+                  <div className="desktop-dock-icon-inner">
+                    <DesktopIcon entry={entry} size={ICON_SIZE} />
+                  </div>
                   {editing && (
-                    <button className="desktop-remove-btn" onClick={() => removeWidget(w)}>
+                    <button className="desktop-remove-btn" onClick={() => removeFromDock(entry)}>
                       −
                     </button>
                   )}
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* 底部 Dock */}
-      <div className="desktop-dock">
-        <div className="desktop-dock-inner">
-          {dockEntries.map((entry) => (
-            <div
-              key={itemKey(entry)}
-              className={`desktop-dock-icon ${editing ? 'jiggling' : ''}`}
-              onMouseDown={(e) => onDockMouseDown(entry, e)}
-              onDoubleClick={() => {
-                if (!editing) onOpen(entry)
-              }}
-            >
-              <div className="desktop-dock-icon-inner">
-                <DesktopIcon entry={entry} size={ICON_SIZE} />
-              </div>
-              {editing && (
-                <button className="desktop-remove-btn" onClick={() => removeFromDock(entry)}>
-                  −
-                </button>
-              )}
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
 
@@ -833,19 +731,6 @@ export default function DesktopView({
           <div className="desktop-item-label" style={{ maxWidth: colW - 12 }}>
             {desktopDisplayName(dragPos.entry.name)}
           </div>
-        </div>
-      )}
-      {dragPos?.kind === 'widget' && dragPos.widget && (
-        <div
-          className="desktop-drag-ghost"
-          style={{
-            left: dragViewX,
-            top: dragViewY,
-            width: dragPos.widget.w * colW + (dragPos.widget.w - 1) * GAP,
-            height: dragPos.widget.h * CELL + (dragPos.widget.h - 1) * GAP
-          }}
-        >
-          <WidgetCard widget={dragPos.widget} />
         </div>
       )}
 

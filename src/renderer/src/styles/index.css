@@ -894,17 +894,6 @@ body.is-dragging * {
   flex-shrink: 0;
 }
 
-.desktop-widget-item {
-  position: absolute;
-  border-radius: 14px;
-}
-
-.desktop-widget-holder {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
 .desktop-item-icon {
   width: 56px;
   height: 56px;
@@ -938,139 +927,8 @@ body.is-dragging * {
   display: block;
 }
 
-/* ===== 小组件卡片 ===== */
-.desktop-widget {
-  border-radius: 18px;
-  background: rgba(22, 26, 36, 0.5);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #fff;
-  padding: 14px 16px;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.desktop-widget-title {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: #fff;
-  margin-bottom: 10px;
-  flex-shrink: 0;
-}
-
-.desktop-widget-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 0;
-}
-
-.desktop-widget-clock-time {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: #fff;
-  text-align: center;
-}
-
-.desktop-widget-sub {
-  font-size: var(--font-size-base);
-  color: rgba(255, 255, 255, 0.75);
-  text-align: center;
-  margin-top: 4px;
-}
-
-.desktop-widget-empty {
-  font-size: var(--font-size-base);
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.desktop-widget-list {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.desktop-widget-todo {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: var(--font-size-base);
-}
-
-.desktop-widget-todo-title {
-  color: #fff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-widget-todo-project {
-  color: rgba(255, 255, 255, 0.55);
-  flex-shrink: 0;
-}
-
-.desktop-widget-project {
-  font-size: var(--font-size-base);
-  color: #fff;
-  padding: 5px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.desktop-widget-project:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.desktop-widget-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.desktop-widget-bar-label {
-  font-size: var(--font-size-base);
-  color: rgba(255, 255, 255, 0.75);
-  width: 32px;
-  flex-shrink: 0;
-}
-
-.desktop-widget-bar {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
-  overflow: hidden;
-}
-
-.desktop-widget-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: #378add;
-}
-
-.desktop-widget-bar-pct {
-  font-size: var(--font-size-base);
-  color: rgba(255, 255, 255, 0.75);
-  width: 34px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
 /* ===== 编辑模式：抖动 + 减号 ===== */
 .desktop-item.jiggling .desktop-icon-holder,
-.desktop-item.jiggling .desktop-widget-holder,
 .desktop-dock-icon.jiggling {
   animation: desktop-jiggle 0.28s ease-in-out infinite;
 }
@@ -1133,22 +991,37 @@ body.is-dragging * {
 }
 
 /* ===== 底部 Dock（背景条铺满，左右 padding 与内容区一致） ===== */
+/* 顶部 padding 必须为 0：内容区（.desktop-pages）的裁剪边界 = Dock 顶部，
+   若留空隙，滚动到最后一行的图标会在 Dock 上方被裁断、悬空在壁纸上 */
 .desktop-dock {
   flex-shrink: 0;
-  padding: 16px 20px;
+  padding: 0 20px 16px;
 }
 
-.desktop-dock-inner {
-  width: 100%;
-  min-height: 80px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 16px;
+.desktop-dock-bar {
   background: rgba(22, 26, 36, 0.55);
   backdrop-filter: blur(14px);
   border-radius: 18px;
+  overflow: hidden;
+}
+/* 裁剪层：内缩 10px 的圆角矩形（圆角 8px，与 Dock 18px 圆角同心/平行），图标滚出在此被圆角裁剪，不露出背景条外 */
+.desktop-dock-clip {
+  margin: 0 10px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.desktop-dock-inner {
+  min-height: 80px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: safe center;
+  gap: 10px;
+  padding: 10px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.desktop-dock-inner::-webkit-scrollbar {
+  display: none;
 }
 
 .desktop-dock-icon {
