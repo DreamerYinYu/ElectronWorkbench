@@ -93,6 +93,24 @@ function isSlotOccupied(
   return false
 }
 
+/** 拆开重叠：保持数组顺序，同一格（col/row）的图标依次往后找空位（横向 ++col，行尾换行），返回无重叠的 icons */
+function dedupeIconPositions(icons: DesktopIconPos[], cols: number): DesktopIconPos[] {
+  const occupied = new Set<string>()
+  return icons.map((p) => {
+    let col = p.col
+    let row = p.row
+    while (occupied.has(`${col},${row}`)) {
+      col++
+      if (col >= cols) {
+        col = 0
+        row++
+      }
+    }
+    occupied.add(`${col},${row}`)
+    return col === p.col && row === p.row ? p : { ...p, col, row }
+  })
+}
+
 interface DragState {
   kind: 'icon' | 'widget'
   key: string
@@ -309,7 +327,9 @@ export default function DesktopView({
     if (editing) return
     e.preventDefault()
     const key = itemKey(entry)
-    // ghost 初始位置对齐「dock 图标中心」（而非鼠标点），保证不管按在 dock 图标哪个位置，ghost 图标都和 dock 图标重合
+    // ghost 初始位置对齐「dock 图标中心」（而非鼠标点），保证不管按在 dock 图标哪个位置，ghost 图标都和 dock 图标重合。
+    // dock 图标 hover 时处于放大态（底边锚定往上长、中心上移），dockRect 是放大后的边界，
+    // 故 dockCy 用「放大后中心」（top + height/2），让 ghost 对齐用户看到的放大图标位置。
     const zoom = parseFloat(document.documentElement.style.zoom || '') || 1
     const dockRect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const cRect = canvasRef.current?.getBoundingClientRect()
@@ -352,7 +372,24 @@ export default function DesktopView({
           }
         }
         if (d.moved) {
-          const next = { ...d, x: d.origX + dx, y: d.origY + dy }
+          let x = d.origX + dx
+          let y = d.origY + dy
+          // clamp：预图标（ghost）不离开可视区、不越过 Dock 底边（canvas 布局坐标）
+          const canvasEl = canvasRef.current
+          if (canvasEl) {
+            const cRect = canvasEl.getBoundingClientRect()
+            const cw = cRect.width / zoom
+            x = Math.max(0, Math.min(x, cw - colW))
+            y = Math.max(0, y)
+            const dockEl = document.querySelector<HTMLElement>('.desktop-dock')
+            if (dockEl) {
+              const dockBottom = (dockEl.getBoundingClientRect().bottom - cRect.top) / zoom
+              // 底部约束用「ghost 图标底边」（6 padding-top + 图标，固定值）而非实测整体高度（含文字）。
+              // 若用整体高度：按下 Dock 图标时 ghost 含文字、底部低于 Dock 底边会被推高，且首帧兜底高度≠实测高度，造成「上跳又回落」抖动。
+              y = Math.min(y, dockBottom - (6 + ICON_SIZE))
+            }
+          }
+          const next = { ...d, x, y }
           dragRef.current = next
           setDrag(next)
         }
@@ -389,30 +426,45 @@ export default function DesktopView({
       const d = dragRef.current
       if (d) {
         if (d.moved) {
-          const el = document.elementFromPoint(e.clientX, e.clientY)
-          const dockEl = el?.closest('.desktop-dock')
           const l = layout ?? { icons: [], widgets: [], dock: [] }
+          const zoom = parseFloat(document.documentElement.style.zoom || '') || 1
+          const dockRoot = document.querySelector<HTMLElement>('.desktop-dock')
+          const cEl = canvasRef.current
+          // 「是否落在 Dock」用鼠标 clientY 是否越过 Dock 顶边判定，而非 elementFromPoint 像素命中
+          // （拖到 Dock 下方/窗外时命中不稳定，导致有时去 Dock、有时不去）
+          const inDock = dockRoot ? e.clientY >= dockRoot.getBoundingClientRect().top : false
           // 落位直接按 ghost 左上角（d.x/d.y 即原图标左上角 + 位移，canvas 布局坐标）吸附网格，
           // 与 ghost 视觉位置严格一致，不会偏半格
           const col = Math.max(0, Math.round((d.x - PADDING) / (colW + GAP)))
-          const row = Math.max(0, Math.round((d.y - PADDING) / (CELL + GAP)))
+          let row = Math.max(0, Math.round((d.y - PADDING) / (CELL + GAP)))
+          // 底部 clamp：落位图标底部不越过 Dock 顶边——松手在 Dock 下方/窗外时，落到 Dock 上方最近格
+          if (dockRoot && cEl) {
+            const dockTop = (dockRoot.getBoundingClientRect().top - cEl.getBoundingClientRect().top) / zoom
+            const maxRow = Math.max(0, Math.floor((dockTop - PADDING - CELL) / (CELL + GAP)))
+            row = Math.min(row, maxRow)
+          }
 
           if (d.kind === 'icon') {
-            if (d.from === 'grid' && dockEl) {
+            if (d.from === 'grid' && inDock) {
               // 网格 → Dock（移动）
               const icons = l.icons.filter((p) => p.key !== d.key)
               const dock = l.dock.includes(d.key) ? l.dock : [...l.dock, d.key]
               void saveLayout({ ...l, icons, dock })
-            } else if (d.from === 'dock' && !dockEl) {
-              // Dock → 网格（移动回），目标格被占则不动
-              if (!isSlotOccupied(l, d.key, col, row, 1, 1)) {
+            } else if (d.from === 'dock' && !inDock) {
+              // Dock → 网格（移动回）。自动排列下位置由 A-Z 排序重排（placed），无需占位检查；
+              // 自定义排列下才需检查目标格是否被占
+              const auto = layout?.autoArrange ?? true
+              if (auto || !isSlotOccupied(l, d.key, col, row, 1, 1)) {
                 const dock = l.dock.filter((k) => k !== d.key)
+                // 自动排列下 col/row 用追加位置（流式填充），避免切换自定义排列时重叠
+                const nextCol = auto ? l.icons.length % cols : col
+                const nextRow = auto ? Math.floor(l.icons.length / cols) : row
                 const icons = l.icons.some((p) => p.key === d.key)
-                  ? l.icons.map((p) => (p.key === d.key ? { ...p, col, row } : p))
-                  : [...l.icons, { key: d.key, col, row }]
+                  ? l.icons.map((p) => (p.key === d.key ? { ...p, col: nextCol, row: nextRow } : p))
+                  : [...l.icons, { key: d.key, col: nextCol, row: nextRow }]
                 void saveLayout({ ...l, icons, dock })
               }
-            } else if (d.from === 'grid' && !dockEl) {
+            } else if (d.from === 'grid' && !inDock) {
               // 网格 → 网格：仅自定义排列下才吸附换位；自动排列下网格位置由 A-Z 固定，拖拽不改变位置
               if (!(layout?.autoArrange ?? true) && !isSlotOccupied(l, d.key, col, row, 1, 1)) {
                 const icons = l.icons.some((p) => p.key === d.key)
@@ -534,10 +586,13 @@ export default function DesktopView({
 
   const setAutoArrange = (v: boolean): void => {
     const l = layout ?? { icons: [], widgets: [], dock: [] }
-    // 只切换模式标志，不覆盖 icons 坐标：icons 始终保存用户的自定义排列（拖拽时更新），
-    // 自动排列时忽略 icons 坐标（运行时 A-Z 计算），切回自定义即恢复用户上次的排列；
-    // 默认坐标填充本身已是 A-Z，所以首次切自定义与自动排列顺序一致
-    void saveLayout({ ...l, autoArrange: v })
+    if (!v) {
+      // 切到自定义：保留用户上次摆放，但拆开重叠（自动模式下新文件/移回追加的坐标可能撞上历史坐标）
+      void saveLayout({ ...l, icons: dedupeIconPositions(l.icons, cols), autoArrange: false })
+    } else {
+      // 切到自动：仅切标志，坐标不动（自动排列忽略坐标，运行时 A-Z 计算）
+      void saveLayout({ ...l, autoArrange: true })
+    }
   }
 
   const viewMenuItems: MenuItem[] = [
