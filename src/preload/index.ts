@@ -32,6 +32,10 @@ const api = {
   onToastData: (callback: (data: { title: string; body: string }) => void): void => {
     ipcRenderer.on('toast:data', (_event, data: { title: string; body: string }) => callback(data))
   },
+  onMottoUpdate: (callback: (motto: unknown) => void): void => {
+    ipcRenderer.on('motto:update', (_event, motto) => callback(motto))
+  },
+  mottoPreview: (motto: unknown): Promise<void> => ipcRenderer.invoke('motto:preview', motto),
   preview: {
     open: (filePath: string): Promise<void> => ipcRenderer.invoke('preview:open', filePath),
     getFile: (): Promise<string> => ipcRenderer.invoke('preview:getFile'),

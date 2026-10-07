@@ -254,6 +254,7 @@ function GeneralPanel({
           </div>
         </div>
       </div>
+
       {confirming && (
         <ConfirmDialog
           title="清除缓存"

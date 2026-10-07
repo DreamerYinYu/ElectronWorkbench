@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useWorkbench } from '../stores/workbench'
 import { formatSize, formatMtime } from '../utils/format'
-import type { ConflictDetail } from '../types'
+import type { ConflictDetail, Motto } from '../types'
 
 /** 取路径的父目录（Windows/Unix 通用，渲染进程无 node path） */
 function dirname(p: string): string {
@@ -13,17 +13,21 @@ function Modal({
   title,
   onClose,
   children,
-  footer
+  footer,
+  overlayClassName
 }: {
   title: string
   onClose: () => void
   children: React.ReactNode
   footer?: React.ReactNode
+  /** 附加到 .overlay 的类名（如 overlay-desktop = 相对桌面容器居中，而非整个主窗体） */
+  overlayClassName?: string
 }) {
   return (
     <div
-      className="overlay show"
+      className={`overlay show${overlayClassName ? ` ${overlayClassName}` : ''}`}
       onMouseDown={(e) => {
+        // 仅当按下发生在遮罩本身（而非弹窗内部）时关闭；文字选择拖拽不会误关
         if (e.target === e.currentTarget) onClose()
       }}
     >
@@ -315,6 +319,136 @@ export function CompressModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="modal-hint">默认保存到项目所在目录，与项目文件夹并列；解压到另一台电脑的工作台可自动识别</div>
+      </div>
+    </Modal>
+  )
+}
+
+/** 座右铭字号候选：8 的倍数大字号序列（32~160，默认 32） */
+const MOTTO_FONT_SIZES = [32, 40, 48, 56, 64, 72, 80, 96, 120, 144, 160]
+
+/** 座右铭文字颜色：标准色块（白/黑/红橙黄绿蓝紫粉青灰） */
+const MOTTO_COLORS = ['#ffffff', '#000000', '#e53935', '#fb8c00', '#fdd835', '#43a047', '#1e88e5', '#8e24aa', '#d81b60', '#00acc1', '#9e9e9e']
+
+/** 设置桌面座右铭：文字/字号/颜色/加粗，实时预览，取消恢复、保存才落盘 */
+export function MottoModal({ onClose }: { onClose: () => void }) {
+  const [draft, setDraft] = useState<Motto | null>(null)
+  const originalRef = useRef<Motto | null>(null)
+
+  useEffect(() => {
+    window.workbench.appSettings.get().then((s) => {
+      setDraft(s.motto)
+      originalRef.current = s.motto
+    })
+  }, [])
+
+  if (!draft) return null
+
+  // 实时预览：改任何字段立即同步到真实桌面窗口（不落盘）
+  const update = (next: Motto) => {
+    setDraft(next)
+    void window.workbench.mottoPreview(next)
+  }
+
+  const confirm = async () => {
+    const s = await window.workbench.appSettings.get()
+    await window.workbench.appSettings.save({ ...s, motto: draft })
+    onClose()
+  }
+
+  // 取消：恢复成打开前的配置（座右铭窗口回到原值），再关闭
+  const cancel = () => {
+    if (originalRef.current) void window.workbench.mottoPreview(originalRef.current)
+    onClose()
+  }
+
+  return (
+    <Modal
+      title="设置座右铭"
+      onClose={cancel}
+      overlayClassName="overlay-desktop"
+      footer={
+        <>
+          <button className="btn" onClick={cancel}>
+            取消
+          </button>
+          <button className="btn primary" onClick={confirm}>
+            保存
+          </button>
+        </>
+      }
+    >
+      <div className="modal-field">
+        <label>座右铭文字</label>
+        <textarea
+          className="motto-textarea"
+          rows={2}
+          placeholder="例如：Stay hungry, stay foolish"
+          value={draft.text}
+          onChange={(e) => update({ ...draft, text: e.target.value })}
+          autoFocus
+        />
+      </div>
+      <div className="modal-field">
+        <label>字体样式</label>
+        <div className="motto-toolbar">
+          <select
+            className="motto-font-select"
+            value={draft.fontSize}
+            onChange={(e) => update({ ...draft, fontSize: parseInt(e.target.value, 10) })}
+          >
+            {MOTTO_FONT_SIZES.map((s) => (
+              <option key={s} value={s}>
+                {s}px
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={`motto-style-btn${draft.bold ? ' active' : ''}`}
+            onClick={() => update({ ...draft, bold: !draft.bold })}
+            aria-pressed={draft.bold}
+            title="加粗"
+            style={{ fontWeight: 700 }}
+          >
+            B
+          </button>
+          <button
+            type="button"
+            className={`motto-style-btn${draft.italic ? ' active' : ''}`}
+            onClick={() => update({ ...draft, italic: !draft.italic })}
+            aria-pressed={draft.italic}
+            title="倾斜"
+            style={{ fontStyle: 'italic' }}
+          >
+            I
+          </button>
+          <button
+            type="button"
+            className={`motto-style-btn${draft.underline ? ' active' : ''}`}
+            onClick={() => update({ ...draft, underline: !draft.underline })}
+            aria-pressed={draft.underline}
+            title="下划线"
+            style={{ textDecoration: 'underline' }}
+          >
+            U
+          </button>
+        </div>
+      </div>
+      <div className="modal-field">
+        <label>文字颜色</label>
+        <div className="motto-colors">
+          {MOTTO_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`motto-swatch${draft.color === c ? ' active' : ''}`}
+              style={{ background: c }}
+              onClick={() => update({ ...draft, color: c })}
+              aria-label={c}
+            />
+          ))}
+        </div>
       </div>
     </Modal>
   )

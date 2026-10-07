@@ -1,6 +1,6 @@
 import { app, shell } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { spawn, spawnSync } from 'child_process'
 import os from 'os'
@@ -18,12 +18,47 @@ export function trayIconPath(): string {
   return join(app.getAppPath(), isWindows ? 'resources/icon.ico' : 'resources/icon.png')
 }
 
+/** 注册 Windows AppUserModelID 的显示名与图标（.ico），让任务栏图标/通知显示「Workbench」而非 Electron */
+export function registerAppUserModelId(): void {
+  if (!isWindows) return
+  try {
+    // 图标落到真实磁盘：打包后 icon.ico 在 app.asar 内，Shell/注册表读不到 asar 内部路径
+    const destIco = join(app.getPath('appData'), 'Workbench', 'app-icon.ico')
+    mkdirSync(dirname(destIco), { recursive: true })
+    writeFileSync(destIco, readFileSync(trayIconPath()))
+    // 写 AUMID 注册表（HKCU 用户级，无需管理员）；IconUri 用 .ico 并显式索引 0
+    const ps = [
+      "$k='HKCU:\\Software\\Classes\\AppUserModelId\\com.dreameryin.workbench'",
+      'New-Item -Path $k -Force | Out-Null',
+      "Set-ItemProperty -Path $k -Name 'DisplayName' -Value 'Workbench' -Type String",
+      "Set-ItemProperty -Path $k -Name 'IconUri' -Value '" + destIco.replace(/'/g, "''") + ",0' -Type String"
+    ].join(';')
+    spawnSync('powershell.exe', ['-NoProfile', '-Command', ps], { windowsHide: true })
+  } catch {
+    // 注册失败不影响主流程：任务栏退回 exe 默认图标
+  }
+}
+
 /** 真实桌面目录列表：Windows = 用户桌面 + 公共桌面；macOS = 用户桌面 */
 export function desktopDirs(): string[] {
   const user = app.getPath('desktop')
   if (!isWindows) return [user]
   const publicRoot = process.env.PUBLIC || join(dirname(dirname(user)), 'Public')
   return [user, join(publicRoot, 'Desktop')]
+}
+
+/** 读取系统壁纸路径（Windows 读注册表；macOS 返回 null） */
+export function readWallpaperPath(): string | null {
+  if (!isWindows) return null
+  try {
+    const out = spawnSync('reg', ['query', 'HKCU\\Control Panel\\Desktop', '/v', 'Wallpaper'], { encoding: 'utf-8' })
+    const m = out.stdout.match(/Wallpaper\s+REG_SZ\s+(.+)/)
+    if (!m) return null
+    const p = m[1].trim()
+    return p && existsSync(p) ? p : null
+  } catch {
+    return null
+  }
 }
 
 /** 读取系统壁纸（Windows 读注册表转 dataURL；macOS 暂不支持返回 null） */

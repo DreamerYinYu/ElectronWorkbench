@@ -4,6 +4,7 @@ import App from './App'
 import SettingsApp from './SettingsApp'
 import PreviewApp from './PreviewApp'
 import ToastApp from './ToastApp'
+import MottoApp from './MottoApp'
 import { applyAppearance } from './utils/appearance'
 import './styles/index.css'
 
@@ -35,6 +36,7 @@ const [route, sub] = hash.split('/')
 const isSettings = route === 'settings'
 const isPreview = route === 'preview'
 const isToast = route === 'toast'
+const isMotto = route === 'motto'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   isSettings ? (
@@ -43,6 +45,8 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <PreviewApp />
   ) : isToast ? (
     <ToastApp />
+  ) : isMotto ? (
+    <MottoApp />
   ) : (
     <React.StrictMode>
       <App />

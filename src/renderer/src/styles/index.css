@@ -1652,7 +1652,9 @@ body.is-dragging * {
   margin-bottom: 6px;
 }
 
-.modal-field input {
+.modal-field input,
+.modal-field textarea,
+.modal-field select {
   width: 100%;
   padding: 8px 10px;
   border-radius: 8px;
@@ -1664,8 +1666,16 @@ body.is-dragging * {
   color: var(--text);
 }
 
-.modal-field input:focus {
+.modal-field input:focus,
+.modal-field textarea:focus,
+.modal-field select:focus {
   border-color: var(--primary);
+}
+
+/* 容器内弹窗：相对桌面容器（.desktop-view）居中，而非整个主窗体 */
+.overlay.overlay-desktop {
+  position: absolute;
+  z-index: 80;
 }
 
 .modal-hint {
@@ -2686,4 +2696,92 @@ body.is-dragging * {
   color: var(--text-faint);
   margin-top: 2px;
   line-height: 1.5;
+}
+
+/* ===== 桌面座右铭透明小窗（仅主屏、事件穿透，只显示文字） ===== */
+.motto-wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.motto-text {
+  text-align: center;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-weight: 500;
+  max-width: 100%;
+  padding: 0 40px;
+}
+
+/* ===== 座右铭对话框表单 ===== */
+.motto-textarea {
+  resize: vertical;
+  min-height: 48px;
+  font-family: inherit;
+}
+.motto-font-select {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--text);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+}
+.motto-font-select:focus {
+  border-color: var(--primary);
+}
+.motto-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.motto-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+}
+.motto-swatch.active {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.motto-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.motto-style-btn {
+  width: 40px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.motto-style-btn:hover {
+  border-color: var(--primary);
+}
+.motto-style-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
 }

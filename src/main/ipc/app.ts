@@ -14,6 +14,7 @@ import type { DesktopLayout } from '../types'
 import { loadProjects } from '../config'
 import { readTodos } from '../projectFiles'
 import { scheduleWorkReminder } from '../reminder'
+import { applyMotto, previewMotto } from '../motto'
 
 let settingsWindow: BrowserWindow | null = null
 let previewWindow: BrowserWindow | null = null
@@ -235,10 +236,17 @@ export function registerAppIpc(): void {
     app.setLoginItemSettings({ openAtLogin: app.isPackaged && settings.autoStart })
     // 工作时长提醒配置可能变化：重新调度计时器
     scheduleWorkReminder()
+    // 座右铭配置可能变化：同步座右铭窗口
+    applyMotto()
     // 广播给所有窗口（主窗口实时同步主题/字号）
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) w.webContents.send('appearance:changed', settings)
     }
+  })
+
+  // 座右铭实时预览：更新桌面窗口但不持久化（取消时由渲染层传回原值）
+  ipcMain.handle('motto:preview', (_e, motto: unknown) => {
+    previewMotto(motto as Parameters<typeof previewMotto>[0])
   })
 
   ipcMain.handle('dialog:selectDirectory', async (e): Promise<string | null> => {

@@ -21,6 +21,7 @@ import type { TodoItem } from '../types'
 function SortableTodoItem({
   todo,
   editing,
+  checked,
   onToggle,
   onEdit,
   onRemove,
@@ -30,6 +31,8 @@ function SortableTodoItem({
 }: {
   todo: TodoItem
   editing: boolean
+  /** 勾选视觉（含乐观勾选过渡态），与分组归属解耦：点击后先打勾、稍后才移入已完成 */
+  checked: boolean
   onToggle: (id: string) => void
   onEdit: (id: string) => void
   onRemove: (id: string) => void
@@ -51,7 +54,7 @@ function SortableTodoItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`todo-item ${todo.completed ? 'done' : ''}`}
+      className={`todo-item ${checked ? 'done' : ''}`}
       {...attributes}
       {...listeners}
     >
@@ -106,6 +109,21 @@ export default function TodoPanel({ width }: { width?: number }) {
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+
+  // 乐观勾选过渡态：点击复选框立即打勾，稍后落盘并移入已完成
+  const [checkedSet, setCheckedSet] = useState<Set<string>>(new Set())
+
+  const handleToggle = (id: string) => {
+    setCheckedSet((prev) => new Set(prev).add(id))
+    setTimeout(() => {
+      toggleTodo(id)
+      setCheckedSet((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }, 400)
+  }
 
   const undone = items.filter((t) => !t.completed && t.title.trim() !== '')
   const done = items.filter((t) => t.completed && t.title.trim() !== '')
@@ -190,7 +208,7 @@ export default function TodoPanel({ width }: { width?: number }) {
 
   const itemProps = {
     editingTodoId,
-    onToggle: toggleTodo,
+    onToggle: handleToggle,
     onEdit: setEditingTodo,
     onRemove: removeTodo,
     onEditKeydown,
@@ -233,7 +251,13 @@ export default function TodoPanel({ width }: { width?: number }) {
               <div className="todo-group-title">未完成</div>
               <SortableContext items={undone.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 {undone.map((t) => (
-                  <SortableTodoItem key={t.id} todo={t} editing={editingTodoId === t.id} {...itemProps} />
+                  <SortableTodoItem
+                    key={t.id}
+                    todo={t}
+                    editing={editingTodoId === t.id}
+                    checked={checkedSet.has(t.id)}
+                    {...itemProps}
+                  />
                 ))}
               </SortableContext>
             </div>
@@ -243,7 +267,13 @@ export default function TodoPanel({ width }: { width?: number }) {
               <div className="todo-group-title">已完成</div>
               <SortableContext items={done.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 {done.map((t) => (
-                  <SortableTodoItem key={t.id} todo={t} editing={editingTodoId === t.id} {...itemProps} />
+                  <SortableTodoItem
+                    key={t.id}
+                    todo={t}
+                    editing={editingTodoId === t.id}
+                    checked={!checkedSet.has(t.id)}
+                    {...itemProps}
+                  />
                 ))}
               </SortableContext>
             </div>

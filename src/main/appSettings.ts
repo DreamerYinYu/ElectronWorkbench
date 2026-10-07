@@ -22,6 +22,16 @@ export interface WorkReminder {
   message: string
 }
 
+/** 桌面座右铭：钉在真实桌面壁纸上、只显示文字（透明+事件穿透） */
+export interface Motto {
+  text: string
+  fontSize: number
+  color: string
+  bold: boolean
+  italic: boolean
+  underline: boolean
+}
+
 export interface AppSettings {
   autoStart: boolean
   projectsFolder: string
@@ -36,6 +46,8 @@ export interface AppSettings {
   textPreview: TextPreviewStyle
   /** 工作时长提醒配置 */
   workReminder: WorkReminder
+  /** 桌面座右铭配置 */
+  motto: Motto
 }
 
 export function defaultAppSettings(): AppSettings {
@@ -47,7 +59,8 @@ export function defaultAppSettings(): AppSettings {
     hiddenItems: [],
     compressOutputDir: '',
     textPreview: { fontSize: 13, fontFamily: '', bold: false, italic: false, underline: false },
-    workReminder: { enabled: true, hours: 8, message: '工作满 8 小时，注意休息' }
+    workReminder: { enabled: true, hours: 8, message: '工作满 8 小时，注意休息' },
+    motto: { text: '', fontSize: 32, color: '#ffffff', bold: false, italic: false, underline: false }
   }
 }
 
@@ -62,6 +75,8 @@ export function loadAppSettings(): AppSettings {
   merged.textPreview = { ...def.textPreview, ...(raw.textPreview ?? {}) }
   // workReminder 同为嵌套对象，单独深合并
   merged.workReminder = { ...def.workReminder, ...(raw.workReminder ?? {}) }
+  // motto 嵌套对象深合并
+  merged.motto = { ...def.motto, ...(raw.motto ?? {}) }
   // 兼容旧版字符串档位（small/medium/large），迁移为数值缩放比例
   const rawFontSize = raw.fontSize
   if (typeof rawFontSize === 'string') {

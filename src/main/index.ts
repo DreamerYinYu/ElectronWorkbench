@@ -9,9 +9,9 @@ import { registerAppIpc } from './ipc/app'
 import { validatePath, registerExtraRoot } from './paths'
 import { loadState, saveState } from './state'
 import { appearanceArgs } from './appSettings'
-import { appIconPath } from './resources'
-import { trayIconPath, desktopDirs } from './platform'
+import { trayIconPath, desktopDirs, registerAppUserModelId } from './platform'
 import { scheduleWorkReminder, showWelcomeNotification } from './reminder'
+import { applyMotto } from './motto'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -32,12 +32,9 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.dreameryin.workbench')
 }
 
-// 禁用硬件加速：避免无 GPU/远程桌面等环境下 GPU 进程崩溃
-app.disableHardwareAcceleration()
-app.commandLine.appendSwitch('disable-gpu')
-app.commandLine.appendSwitch('disable-gpu-compositing')
-app.commandLine.appendSwitch('in-process-gpu')
-// 禁用 overlay 滚动条，让 ::-webkit-scrollbar 自定义宽度生效（否则 Windows 下滚动条宽度不可控）
+// 透明窗口依赖 GPU 合成；笔记本双显卡下 Chromium 默认走核显（透明支持差，导致座右铭白底），
+// 强制使用高性能独显（RTX 3060）渲染
+app.commandLine.appendSwitch('force_high_performance_gpu')
 app.commandLine.appendSwitch('disable-features', 'OverlayScrollbar')
 
 // 注册 workbench:// 协议：让渲染层加载本地文件（图片/视频缩略图），带路径校验
@@ -66,7 +63,7 @@ function createWindow(): void {
     frame: false,
     title: 'Workbench',
     backgroundColor: '#f4f5f7',
-    icon: appIconPath(),
+    icon: trayIconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -183,6 +180,9 @@ if (!gotTheLock) {
     registerArchiveIpc()
     registerAppIpc()
 
+    // 注册 AUMID 显示名/图标（.ico），让任务栏图标显示 Workbench 而非 Electron
+    registerAppUserModelId()
+
     createWindow()
     createTray()
 
@@ -190,6 +190,8 @@ if (!gotTheLock) {
     showWelcomeNotification()
     // 工作时长提醒：从电脑本次开机起计时，满设定时长后弹系统通知
     scheduleWorkReminder()
+    // 桌面座右铭：透明窗口（仅主屏、事件穿透、钉桌面置底）
+    applyMotto()
 
     ipcMain.on('window:minimize', (e) => {
       BrowserWindow.fromWebContents(e.sender)?.minimize()

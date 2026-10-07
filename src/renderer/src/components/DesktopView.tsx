@@ -3,6 +3,7 @@ import { useWorkbench } from '../stores/workbench'
 import DesktopIcon from './DesktopIcon'
 import { Menu } from './Menu'
 import type { MenuItem } from './Menu'
+import { MottoModal } from './modals'
 import { desktopDisplayName } from '../utils/format'
 import type { FileEntry, DesktopLayout, DesktopIconPos } from '../types'
 
@@ -158,6 +159,10 @@ export default function DesktopView({
   const [editMenu, setEditMenu] = useState<{ x: number; y: number } | null>(null)
   /** 「查看」菜单的下拉菜单锚点（null = 关闭） */
   const [viewMenu, setViewMenu] = useState<{ x: number; y: number } | null>(null)
+  /** 「工具」菜单的下拉菜单锚点（null = 关闭） */
+  const [toolMenu, setToolMenu] = useState<{ x: number; y: number } | null>(null)
+  /** 「设置座右铭」内置弹窗开关 */
+  const [mottoOpen, setMottoOpen] = useState(false)
   const [drag, setDrag] = useState<DragState | null>(null)
   const pagesRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -551,6 +556,17 @@ export default function DesktopView({
     { label: '自定义排列', checked: !autoArrange, onClick: () => setAutoArrange(false) }
   ]
 
+  // 「工具」菜单：设置桌面座右铭
+  const openToolMenu = (e: React.MouseEvent): void => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const zoom = parseFloat(document.documentElement.style.zoom || '') || 1
+    setToolMenu({ x: rect.left / zoom, y: rect.bottom / zoom })
+  }
+
+  const toolMenuItems: MenuItem[] = [
+    { label: '设置座右铭', onClick: () => setMottoOpen(true) }
+  ]
+
   const pad = (n: number): string => String(n).padStart(2, '0')
   const week = ['日', '一', '二', '三', '四', '五', '六'][time.getDay()]
 
@@ -578,7 +594,6 @@ export default function DesktopView({
     >
       {/* 顶部菜单栏 */}
       <div className="desktop-menubar">
-        <span className="desktop-menubar-menu">访达</span>
         <span className="desktop-menubar-menu">文件</span>
         <span
           className={`desktop-menubar-menu desktop-menubar-menu-action${editMenu ? ' desktop-menubar-menu-open' : ''}`}
@@ -594,6 +609,12 @@ export default function DesktopView({
         </span>
         <span className="desktop-menubar-menu">前往</span>
         <span className="desktop-menubar-menu">窗口</span>
+        <span
+          className={`desktop-menubar-menu desktop-menubar-menu-action${toolMenu ? ' desktop-menubar-menu-open' : ''}`}
+          onClick={openToolMenu}
+        >
+          工具
+        </span>
         <span className="desktop-menubar-menu">帮助</span>
         <div className="desktop-menubar-spacer" />
         <span className="desktop-menubar-time">
@@ -753,6 +774,19 @@ export default function DesktopView({
           onSelect={() => setViewMenu(null)}
         />
       )}
+
+      {/* 「工具」下拉菜单 */}
+      {toolMenu && (
+        <Menu
+          anchor={toolMenu}
+          items={toolMenuItems}
+          onClose={() => setToolMenu(null)}
+          onSelect={() => setToolMenu(null)}
+        />
+      )}
+
+      {/* 「设置座右铭」内置弹窗 */}
+      {mottoOpen && <MottoModal onClose={() => setMottoOpen(false)} />}
 
       {/* 框选矩形 */}
       {rubberBand && (

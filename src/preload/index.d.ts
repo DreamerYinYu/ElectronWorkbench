@@ -20,6 +20,8 @@ declare global {
       openPath: (target: string) => Promise<string>
       getBootInfo: () => Promise<{ bootTime: number; uptimeMs: number }>
       onToastData: (callback: (data: { title: string; body: string }) => void) => void
+      onMottoUpdate: (callback: (motto: { text: string; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean }) => void) => void
+      mottoPreview: (motto: { text: string; fontSize: number; color: string; bold: boolean; italic: boolean; underline: boolean }) => Promise<void>
       preview: {
         open: (filePath: string) => Promise<void>
         getFile: () => Promise<string>

@@ -99,6 +99,16 @@ export interface WorkReminder {
   message: string
 }
 
+/** 桌面座右铭：钉在真实桌面壁纸上、只显示文字（透明+事件穿透） */
+export interface Motto {
+  text: string
+  fontSize: number
+  color: string
+  bold: boolean
+  italic: boolean
+  underline: boolean
+}
+
 export interface AppSettings {
   autoStart: boolean
   projectsFolder: string
@@ -113,4 +123,6 @@ export interface AppSettings {
   textPreview: TextPreviewStyle
   /** 工作时长提醒配置 */
   workReminder: WorkReminder
+  /** 桌面座右铭配置 */
+  motto: Motto
 }
