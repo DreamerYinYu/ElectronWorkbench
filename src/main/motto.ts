@@ -55,11 +55,19 @@ function sendToBottom(win: BrowserWindow): Promise<void> {
 
 /**
  * 显示/更新座右铭窗口（用传入的 motto，不读配置、不持久化）。
- * 文字非空则创建/更新透明窗口，空则关闭。供 applyMotto（正式）与 previewMotto（实时预览）共用。
+ * 文字非空则创建/更新透明窗口，空则视 keepOnEmpty 处理。供 applyMotto（正式）与 previewMotto（实时预览）共用。
+ * @param keepOnEmpty 文字为空时是否保留窗口（true=显示空白不关窗口；false=关闭窗口）
  */
-function showMottoWindow(motto: Motto): void {
+function showMottoWindow(motto: Motto, keepOnEmpty: boolean): void {
   const text = (motto?.text ?? '').trim()
   if (!text) {
+    if (keepOnEmpty) {
+      // 预览态：保留窗口、显示空白（透明+穿透，视觉无影响），避免「关闭→再输入→重建窗口+show()抢焦点」打断输入
+      if (mottoWindow && !mottoWindow.isDestroyed()) {
+        mottoWindow.webContents.send('motto:update', motto)
+      }
+      return
+    }
     if (mottoWindow && !mottoWindow.isDestroyed()) mottoWindow.close()
     mottoWindow = null
     return
@@ -120,10 +128,10 @@ function showMottoWindow(motto: Motto): void {
  * 再 SetWindowPos(HWND_BOTTOM) 压到 Z 序底部。透明依赖 GPU 合成。
  */
 export function applyMotto(): void {
-  showMottoWindow(loadAppSettings().motto)
+  showMottoWindow(loadAppSettings().motto, false)
 }
 
 /** 实时预览座右铭：用传入的 motto 更新窗口内容，但不持久化到配置（取消时由调用方恢复原值） */
 export function previewMotto(motto: Motto): void {
-  showMottoWindow(motto)
+  showMottoWindow(motto, true)
 }

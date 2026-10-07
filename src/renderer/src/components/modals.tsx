@@ -383,7 +383,6 @@ export function MottoModal({ onClose }: { onClose: () => void }) {
         <textarea
           className="motto-textarea"
           rows={2}
-          placeholder="例如：Stay hungry, stay foolish"
           value={draft.text}
           onChange={(e) => update({ ...draft, text: e.target.value })}
           autoFocus
