@@ -167,14 +167,13 @@ export default function App() {
 
   useEffect(() => {
     init()
-    // 应用外观设置（主题/字号），并订阅设置变化实时同步（含文件隐藏项变化时刷新列表）
+    // 应用外观设置（主题/字号），并订阅设置变化实时同步（仅外观，不再连带刷新文件）
     window.workbench.appSettings.get().then(applyAppearance)
     const off = window.workbench.onAppearanceChanged((s) => {
       applyAppearance(s)
-      refreshFiles()
     })
     return off
-  }, [init, refreshFiles])
+  }, [init])
 
   // Ctrl+, 打开设置（全局快捷键，对应用户菜单里「设置」的提示）
   useEffect(() => {

@@ -231,16 +231,36 @@ export function registerAppIpc(): void {
   })
 
   ipcMain.handle('app:saveSettings', (_e, settings: AppSettings) => {
+    const prev = loadAppSettings()
     saveAppSettings(settings)
-    // 同步开机自启设置到系统（写注册表/登录项）；未打包（dev）时不注册，避免 electron.exe 被写入登录项
-    app.setLoginItemSettings({ openAtLogin: app.isPackaged && settings.autoStart })
-    // 工作时长提醒配置可能变化：重新调度计时器
-    scheduleWorkReminder()
-    // 座右铭配置可能变化：同步座右铭窗口
-    applyMotto()
-    // 广播给所有窗口（主窗口实时同步主题/字号）
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w.isDestroyed()) w.webContents.send('appearance:changed', settings)
+
+    // 开机自启：仅当该字段变化时同步到系统（写注册表/登录项）；未打包（dev）时不注册，避免 electron.exe 被写入登录项
+    if (prev.autoStart !== settings.autoStart) {
+      app.setLoginItemSettings({ openAtLogin: app.isPackaged && settings.autoStart })
+    }
+    // 工作时长提醒：仅当提醒配置变化时重新调度计时器
+    if (
+      prev.workReminder.enabled !== settings.workReminder.enabled ||
+      prev.workReminder.hours !== settings.workReminder.hours ||
+      prev.workReminder.message !== settings.workReminder.message
+    ) {
+      scheduleWorkReminder()
+    }
+    // 座右铭：仅当座右铭配置变化时同步座右铭窗口（保存时正式应用；实时预览走 previewMotto）
+    if (JSON.stringify(prev.motto) !== JSON.stringify(settings.motto)) {
+      applyMotto()
+    }
+    // 外观（主题/字号）：仅当变化时广播，主窗口 applyAppearance 同步
+    if (prev.theme !== settings.theme || prev.fontSize !== settings.fontSize) {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) w.webContents.send('appearance:changed', settings)
+      }
+    }
+    // 文件隐藏项：仅当变化时通知主窗口刷新文件列表（fs:changed 复用现有刷新通道）
+    if (JSON.stringify(prev.hiddenItems) !== JSON.stringify(settings.hiddenItems)) {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) w.webContents.send('fs:changed')
+      }
     }
   })
 
