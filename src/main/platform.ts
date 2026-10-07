@@ -3,6 +3,7 @@ import { join, dirname } from 'path'
 import { existsSync, readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { spawn, spawnSync } from 'child_process'
+import os from 'os'
 import type { FileEntry } from './types'
 
 /** 平台判断 */
@@ -40,6 +41,39 @@ export function readWallpaper(): string | null {
   } catch {
     return null
   }
+}
+
+/** 系统开机时间缓存（一次启动内不变，避免每次 getBootInfo 都 spawn PowerShell） */
+let bootTimeCache: number | null = null
+
+/** 获取系统开机时间（epoch 毫秒）。Windows 读事件日志 Kernel-Boot Event ID 27；macOS 用进程 uptime 近似降级 */
+export function getSystemBootTime(): number {
+  if (bootTimeCache !== null) return bootTimeCache
+  let result: number
+  if (!isWindows) {
+    result = Date.now() - os.uptime() * 1000
+  } else {
+    try {
+      // 读事件日志 Event ID 27（Microsoft-Windows-Kernel-Boot）：每次通电/快速启动恢复都会记录，
+      // 反映用户感知的「本次开机时刻」。而 LastBootUpTime / Event ID 12 只在完整 boot 时更新
+      // （Windows「快速启动」下关机=休眠内核，不更新，会停留在上次真重启的时间，偏差数天）。
+      const out = spawnSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-Command',
+          "$t=(Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='Microsoft-Windows-Kernel-Boot';ID=27} -MaxEvents 1 -ErrorAction SilentlyContinue|Select-Object -First 1).TimeCreated; if($t){[DateTimeOffset]::new($t).ToUnixTimeMilliseconds()}"
+        ],
+        { encoding: 'utf-8', windowsHide: true, timeout: 15000 }
+      )
+      const ms = parseInt(out.stdout.trim(), 10)
+      result = Number.isFinite(ms) && ms > 0 ? ms : Date.now() - os.uptime() * 1000
+    } catch {
+      result = Date.now() - os.uptime() * 1000
+    }
+  }
+  bootTimeCache = result
+  return result
 }
 
 /** 桌面虚拟图标（此电脑/回收站）：Windows 命名空间对象，macOS 无 */

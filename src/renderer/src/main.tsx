@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import SettingsApp from './SettingsApp'
 import PreviewApp from './PreviewApp'
+import ToastApp from './ToastApp'
 import { applyAppearance } from './utils/appearance'
 import './styles/index.css'
 
@@ -29,16 +30,19 @@ window.addEventListener('unhandledrejection', (e) => {
 applyAppearance(window.workbench.initialAppearance)
 
 const hash = window.location.hash.replace('#', '')
-// hash 形如 'settings' 或 'settings/appearance'（后者用于打开设置并定位到指定标签页）
+// hash 形如 'settings' 或 'settings/appearance'（后者用于打开设置并定位到指定标签页）、'toast'（右下角通知小窗）
 const [route, sub] = hash.split('/')
 const isSettings = route === 'settings'
 const isPreview = route === 'preview'
+const isToast = route === 'toast'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   isSettings ? (
     <SettingsApp initialTab={sub} />
   ) : isPreview ? (
     <PreviewApp />
+  ) : isToast ? (
+    <ToastApp />
   ) : (
     <React.StrictMode>
       <App />

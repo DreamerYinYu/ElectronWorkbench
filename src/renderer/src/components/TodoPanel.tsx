@@ -107,8 +107,8 @@ export default function TodoPanel({ width }: { width?: number }) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  const undone = items.filter((t) => !t.completed)
-  const done = items.filter((t) => t.completed)
+  const undone = items.filter((t) => !t.completed && t.title.trim() !== '')
+  const done = items.filter((t) => t.completed && t.title.trim() !== '')
   const activeTodo = items.find((t) => t.id === activeId) ?? null
 
   useEffect(() => {
@@ -142,10 +142,10 @@ export default function TodoPanel({ width }: { width?: number }) {
     if (e.key !== 'Enter') return
     e.preventDefault()
     const v = e.currentTarget.value.trim()
+    // 回车仅保存当前待办并退出编辑，不再自动创建空待办行
     if (v) updateTodo(todo.id, v)
-    addTodo('').then((next) => {
-      if (next) setEditingTodo(next.id)
-    })
+    else if (todo.title === '') removeTodo(todo.id)
+    setEditingTodo(null)
   }
 
   const onEditBlur = (e: React.FocusEvent<HTMLTextAreaElement>, todo: TodoItem) => {
@@ -216,7 +216,9 @@ export default function TodoPanel({ width }: { width?: number }) {
         />
       </div>
       <div className="todo-list">
-        {todos.length === 0 && <div className="todo-empty">暂无待办事项，从上面输入开始添加</div>}
+        {undone.length === 0 && done.length === 0 && (
+          <div className="todo-empty">暂无待办事项，从上面输入开始添加</div>
+        )}
         <DndContext
           sensors={sensors}
           measuring={zoomMeasuring}

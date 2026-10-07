@@ -646,7 +646,11 @@ export function registerFsIpc(): void {
     }
 
     for (const dir of dirs) {
-      const w = watch(dir, { recursive: true }, () => {
+      const w = watch(dir, { recursive: true }, (_event, filename) => {
+        // 忽略 .workbench 元数据目录（todos.json/project.json/pinned.json 写入），
+        // 避免改待办/设置时误触发内容区刷新（"重新计算大小"的根源）
+        const name = filename ? String(filename) : ''
+        if (name.replace(/\\/g, '/').includes('.workbench')) return
         if (watchDebounce) clearTimeout(watchDebounce)
         watchDebounce = setTimeout(() => {
           for (const win of BrowserWindow.getAllWindows()) {

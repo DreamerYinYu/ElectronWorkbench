@@ -27,6 +27,11 @@ const api = {
   getDataPaths: (): Promise<{ configDir: string; projectsFolder: string }> =>
     ipcRenderer.invoke('app:getDataPaths'),
   openPath: (target: string): Promise<string> => ipcRenderer.invoke('app:openPath', target),
+  getBootInfo: (): Promise<{ bootTime: number; uptimeMs: number }> =>
+    ipcRenderer.invoke('app:getBootInfo'),
+  onToastData: (callback: (data: { title: string; body: string }) => void): void => {
+    ipcRenderer.on('toast:data', (_event, data: { title: string; body: string }) => callback(data))
+  },
   preview: {
     open: (filePath: string): Promise<void> => ipcRenderer.invoke('preview:open', filePath),
     getFile: (): Promise<string> => ipcRenderer.invoke('preview:getFile'),

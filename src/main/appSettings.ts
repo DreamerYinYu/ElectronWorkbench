@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { mkdirSync } from 'fs'
 import { app } from 'electron'
 import { loadSection, saveSection } from './store'
 
@@ -14,6 +15,13 @@ export interface TextPreviewStyle {
   underline: boolean
 }
 
+/** 工作时长提醒：从电脑本次开机起计时，满 hours 小时后右下角弹通知 */
+export interface WorkReminder {
+  enabled: boolean
+  hours: number
+  message: string
+}
+
 export interface AppSettings {
   autoStart: boolean
   projectsFolder: string
@@ -26,6 +34,8 @@ export interface AppSettings {
   compressOutputDir: string
   /** 文本预览显示样式偏好（全局共享） */
   textPreview: TextPreviewStyle
+  /** 工作时长提醒配置 */
+  workReminder: WorkReminder
 }
 
 export function defaultAppSettings(): AppSettings {
@@ -36,7 +46,8 @@ export function defaultAppSettings(): AppSettings {
     fontSize: 1,
     hiddenItems: [],
     compressOutputDir: '',
-    textPreview: { fontSize: 13, fontFamily: '', bold: false, italic: false, underline: false }
+    textPreview: { fontSize: 13, fontFamily: '', bold: false, italic: false, underline: false },
+    workReminder: { enabled: true, hours: 8, message: '工作满 8 小时，注意休息' }
   }
 }
 
@@ -49,6 +60,8 @@ export function loadAppSettings(): AppSettings {
   const merged: AppSettings = { ...def, ...raw, projectsFolder }
   // textPreview 为嵌套对象，浅合并会整体覆盖，需单独深合并以保留缺省字段
   merged.textPreview = { ...def.textPreview, ...(raw.textPreview ?? {}) }
+  // workReminder 同为嵌套对象，单独深合并
+  merged.workReminder = { ...def.workReminder, ...(raw.workReminder ?? {}) }
   // 兼容旧版字符串档位（small/medium/large），迁移为数值缩放比例
   const rawFontSize = raw.fontSize
   if (typeof rawFontSize === 'string') {
@@ -64,7 +77,11 @@ export function saveAppSettings(settings: AppSettings): void {
 }
 
 export function resolveDefaultProjectsDir(): string {
-  return join(app.getPath('documents'), 'Workbench Projects')
+  const dir = join(app.getPath('documents'), 'Workbench Projects')
+  // 确保默认项目目录存在：设置面板「打开目录」、项目扫描、新建项目都依赖它；
+  // 之前从未创建，导致「打开目录」对不存在的目录静默失败（shell.openPath 无反应）
+  mkdirSync(dir, { recursive: true })
+  return dir
 }
 
 /**

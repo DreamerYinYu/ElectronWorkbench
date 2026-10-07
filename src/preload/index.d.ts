@@ -18,6 +18,8 @@ declare global {
       selectDirectory: () => Promise<string | null>
       getDataPaths: () => Promise<{ configDir: string; projectsFolder: string }>
       openPath: (target: string) => Promise<string>
+      getBootInfo: () => Promise<{ bootTime: number; uptimeMs: number }>
+      onToastData: (callback: (data: { title: string; body: string }) => void) => void
       preview: {
         open: (filePath: string) => Promise<void>
         getFile: () => Promise<string>

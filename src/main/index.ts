@@ -11,6 +11,7 @@ import { loadState, saveState } from './state'
 import { appearanceArgs } from './appSettings'
 import { appIconPath } from './resources'
 import { trayIconPath, desktopDirs } from './platform'
+import { scheduleWorkReminder, showWelcomeNotification } from './reminder'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -184,6 +185,11 @@ if (!gotTheLock) {
 
     createWindow()
     createTray()
+
+    // 启动欢迎通知（桌面右下角系统通知）
+    showWelcomeNotification()
+    // 工作时长提醒：从电脑本次开机起计时，满设定时长后弹系统通知
+    scheduleWorkReminder()
 
     ipcMain.on('window:minimize', (e) => {
       BrowserWindow.fromWebContents(e.sender)?.minimize()

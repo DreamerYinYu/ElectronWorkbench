@@ -100,6 +100,24 @@ function FontSizeSlider({
   )
 }
 
+/** 开机时间格式化：YYYY-MM-DD HH:mm */
+function formatBootTime(ms: number): string {
+  const d = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** 运行时长格式化：X天X小时X分钟 / X小时X分钟 / X分钟 */
+function formatUptime(ms: number): string {
+  const totalMin = Math.floor(ms / 60000)
+  const days = Math.floor(totalMin / 1440)
+  const hours = Math.floor((totalMin % 1440) / 60)
+  const mins = totalMin % 60
+  if (days > 0) return `${days}天${hours}小时${mins}分钟`
+  if (hours > 0) return `${hours}小时${mins}分钟`
+  return `${mins}分钟`
+}
+
 function GeneralPanel({
   settings,
   save
@@ -109,8 +127,16 @@ function GeneralPanel({
 }) {
   const [configDir, setConfigDir] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [bootTime, setBootTime] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     window.workbench.getDataPaths().then((p) => setConfigDir(p.configDir))
+  }, [])
+  // 开机时间 + 已运行时长（每分钟刷新一次显示）
+  useEffect(() => {
+    window.workbench.getBootInfo().then((info) => setBootTime(info.bootTime))
+    const t = setInterval(() => setNow(Date.now()), 60000)
+    return () => clearInterval(t)
   }, [])
 
   return (
@@ -173,6 +199,61 @@ function GeneralPanel({
           </button>
         </div>
       </div>
+
+      <div className="settings-section-title">工作提醒</div>
+      <div className="setting-row setting-group">
+        <div className="setting-item">
+          <div className="setting-info">
+            <div className="setting-name">满时长提醒</div>
+            <div className="setting-desc">从电脑本次开机起计时，满设定时长后右下角弹通知提醒休息。</div>
+          </div>
+          <Switch
+            checked={settings.workReminder.enabled}
+            onChange={(v) => save({ workReminder: { ...settings.workReminder, enabled: v } })}
+          />
+        </div>
+        <div className="setting-item">
+          <div className="setting-info">
+            <div className="setting-name">提醒时长</div>
+          </div>
+          <div className="setting-dir">
+            <input
+              className="setting-input"
+              type="number"
+              min={1}
+              max={24}
+              value={settings.workReminder.hours}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                if (Number.isFinite(v)) {
+                  save({ workReminder: { ...settings.workReminder, hours: Math.min(24, Math.max(1, v)) } })
+                }
+              }}
+            />
+            <span>小时</span>
+          </div>
+        </div>
+        <div className="setting-item">
+          <div className="setting-info">
+            <div className="setting-name">提醒文案</div>
+          </div>
+          <input
+            className="setting-input"
+            value={settings.workReminder.message}
+            onChange={(e) => save({ workReminder: { ...settings.workReminder, message: e.target.value } })}
+          />
+        </div>
+        <div className="setting-item">
+          <div className="setting-info">
+            <div className="setting-name">本次开机时间</div>
+            <div className="setting-desc">
+              {bootTime !== null
+                ? `${formatBootTime(bootTime)} · 已运行 ${formatUptime(now - bootTime)}`
+                : '加载中…'}
+            </div>
+          </div>
+        </div>
+      </div>
       {confirming && (
         <ConfirmDialog
           title="清除缓存"
@@ -233,7 +314,7 @@ function AboutPanel() {
       <div className="setting-row">
         <div className="setting-info">
           <div className="setting-name">Workbench</div>
-          <div className="setting-desc">版本信息 · V1.1</div>
+          <div className="setting-desc">版本信息 · V1.2</div>
           <div className="setting-desc">Electron + React 18 + TypeScript · 数据全部保存在本地</div>
         </div>
       </div>

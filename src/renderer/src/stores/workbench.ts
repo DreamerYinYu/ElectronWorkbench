@@ -527,6 +527,8 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   addTodo: async (title) => {
     const id = get().currentProjectId
     if (!id) return undefined
+    // 空标题不创建（避免生成空待办行）
+    if (!title.trim()) return undefined
     const item = await window.workbench.todos.add(id, title)
     await get().loadTodos()
     return item

@@ -8,11 +8,12 @@ import type { AppSettings } from '../appSettings'
 import { loadState, saveState } from '../state'
 import type { UiState } from '../state'
 import { appIconPath } from '../resources'
-import { readWallpaper } from '../platform'
+import { readWallpaper, getSystemBootTime } from '../platform'
 import { loadSection, saveSection, resetAll } from '../store'
 import type { DesktopLayout } from '../types'
 import { loadProjects } from '../config'
 import { readTodos } from '../projectFiles'
+import { scheduleWorkReminder } from '../reminder'
 
 let settingsWindow: BrowserWindow | null = null
 let previewWindow: BrowserWindow | null = null
@@ -172,6 +173,12 @@ export function registerAppIpc(): void {
     }
   })
 
+  // 系统开机时间 + 已运行时长（设置面板「工作时长提醒」展示 + 计时用）
+  ipcMain.handle('app:getBootInfo', (): { bootTime: number; uptimeMs: number } => {
+    const bootTime = getSystemBootTime()
+    return { bootTime, uptimeMs: Date.now() - bootTime }
+  })
+
   ipcMain.handle('app:getDefaultProjectsDir', () => {
     // 优先用设置里保存的项目文件夹，未设置时才回退到文档目录
     const s = loadAppSettings()
@@ -226,6 +233,8 @@ export function registerAppIpc(): void {
     saveAppSettings(settings)
     // 同步开机自启设置到系统（写注册表/登录项）；未打包（dev）时不注册，避免 electron.exe 被写入登录项
     app.setLoginItemSettings({ openAtLogin: app.isPackaged && settings.autoStart })
+    // 工作时长提醒配置可能变化：重新调度计时器
+    scheduleWorkReminder()
     // 广播给所有窗口（主窗口实时同步主题/字号）
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) w.webContents.send('appearance:changed', settings)

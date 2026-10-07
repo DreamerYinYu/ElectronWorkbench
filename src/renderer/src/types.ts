@@ -92,6 +92,13 @@ export interface TextPreviewStyle {
   underline: boolean
 }
 
+/** 工作时长提醒：从电脑本次开机起计时，满 hours 小时后右下角弹通知 */
+export interface WorkReminder {
+  enabled: boolean
+  hours: number
+  message: string
+}
+
 export interface AppSettings {
   autoStart: boolean
   projectsFolder: string
@@ -104,4 +111,6 @@ export interface AppSettings {
   compressOutputDir: string
   /** 文本预览显示样式偏好（全局共享） */
   textPreview: TextPreviewStyle
+  /** 工作时长提醒配置 */
+  workReminder: WorkReminder
 }
