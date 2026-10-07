@@ -13,7 +13,7 @@ import { loadSection, saveSection, resetAll } from '../store'
 import type { DesktopLayout } from '../types'
 import { loadProjects } from '../config'
 import { readTodos } from '../projectFiles'
-import { scheduleWorkReminder } from '../reminder'
+import { scheduleWorkReminder, hideToastWindow, setToastInteractive } from '../reminder'
 import { applyMotto, previewMotto } from '../motto'
 
 let settingsWindow: BrowserWindow | null = null
@@ -267,6 +267,16 @@ export function registerAppIpc(): void {
   // 座右铭实时预览：更新桌面窗口但不持久化（取消时由渲染层传回原值）
   ipcMain.handle('motto:preview', (_e, motto: unknown) => {
     previewMotto(motto as Parameters<typeof previewMotto>[0])
+  })
+
+  // 所有 toast 关闭后隐藏通知窗口
+  ipcMain.handle('toast:close', () => {
+    hideToastWindow()
+  })
+
+  // 动态切换 toast 窗口鼠标穿透（渲染层 mousemove 判断鼠标是否在卡片上）
+  ipcMain.handle('toast:interactive', (_e, interactive: boolean) => {
+    setToastInteractive(interactive)
   })
 
   ipcMain.handle('dialog:selectDirectory', async (e): Promise<string | null> => {

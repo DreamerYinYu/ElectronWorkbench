@@ -2623,15 +2623,32 @@ body.is-dragging * {
   cursor: pointer;
 }
 
-/* ===== 右下角通知小窗（独立透明置顶窗，复刻系统 toast 布局） ===== */
+/* ===== 右下角通知小窗（独立透明置顶窗，多条纵向堆叠、点一条关一条） =====
+   窗口固定铺满主屏工作区右缘（不动态 resize，根除裁剪/抖动）：
+   主进程 setIgnoreMouseEvents(true,{forward:true}) 整体穿透，
+   此处 .toast-wrap pointer-events:none（空白区穿透）、.toast-card pointer-events:auto（卡片可交互） */
 .toast-wrap {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-end;
   padding: 16px;
   box-sizing: border-box;
+  pointer-events: none;
+  overflow: hidden;
+}
+.toast-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.toast-stack::-webkit-scrollbar {
+  display: none;
 }
 .toast-card {
   width: 100%;
@@ -2640,12 +2657,30 @@ body.is-dragging * {
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-  animation: toast-in 0.25s ease;
+  box-sizing: border-box;
+  overflow: hidden;
+  max-height: 200px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+  pointer-events: auto;
+  transition: max-height 0.22s ease, opacity 0.22s ease, padding 0.22s ease, margin-bottom 0.22s ease;
+  animation: toast-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.toast-card:last-child {
+  margin-bottom: 0;
+}
+.toast-card.closing {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  pointer-events: none;
 }
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;

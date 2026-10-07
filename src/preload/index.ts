@@ -32,6 +32,9 @@ const api = {
   onToastData: (callback: (data: { title: string; body: string }) => void): void => {
     ipcRenderer.on('toast:data', (_event, data: { title: string; body: string }) => callback(data))
   },
+  toastClose: (): Promise<void> => ipcRenderer.invoke('toast:close'),
+  toastInteractive: (interactive: boolean): Promise<void> =>
+    ipcRenderer.invoke('toast:interactive', interactive),
   onMottoUpdate: (callback: (motto: unknown) => void): void => {
     ipcRenderer.on('motto:update', (_event, motto) => callback(motto))
   },
